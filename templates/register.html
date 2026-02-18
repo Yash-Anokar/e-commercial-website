@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Register - E-Shop{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: center; align-items: center; min-height: 60vh;">
+    <div class="card" style="width: 100%; max-width: 400px;">
+        <div class="card-header text-center">
+            <h2>Create Your Account</h2>
+            <p style="color: var(--text-light); margin-top: 0.5rem;">Join us and start shopping!</p>
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email (Optional)</label>
+                <input type="email" id="email" name="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <small style="color: var(--text-light); font-size: 0.8rem;">Minimum 6 characters</small>
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%;">Create Account</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <p style="color: var(--text-light);">Already have an account? 
+                <a href="{{ url_for('login') }}" style="color: var(--primary); text-decoration: none; font-weight: 600;">Sign in here</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

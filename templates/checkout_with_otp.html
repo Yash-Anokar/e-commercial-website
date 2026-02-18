@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout with OTP - VAPC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        h1, h2 {
+            color: #1f2937;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: #10b981;
+        }
+
+        .btn-secondary:hover {
+            background: #059669;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .order-summary {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .total {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #10b981;
+            margin-top: 1rem;
+        }
+
+        .otp-section {
+            display: none;
+            background: #eff6ff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 2px solid #3b82f6;
+            margin: 1rem 0;
+        }
+
+        .otp-section.active {
+            display: block;
+        }
+
+        .otp-input {
+            width: 150px;
+            text-align: center;
+            font-size: 1.5rem;
+            letter-spacing: 0.5rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+
+        .verified-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-left: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🛒 Secure Checkout</h1>
+            
+            <!-- Order Summary -->
+            <div class="order-summary">
+                <h2>Order Summary</h2>
+                {% for item in cart_items %}
+                <div class="order-item">
+                    <span>{{ item['name'] }} x {{ item['quantity'] }}</span>
+                    <span>₹{{ "%.2f"|format(item['price'] * item['quantity']) }}</span>
+                </div>
+                {% endfor %}
+                <div class="total">
+                    Total: ₹{{ "%.2f"|format(total) }}
+                </div>
+            </div>
+
+            <!-- Delivery Form -->
+            <form method="POST" action="{{ url_for('process_checkout') }}" id="checkoutForm">
+                <h2>📍 Delivery Information</h2>
+                
+                <div class="row">
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" name="customer_name" required placeholder="Enter your full name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            Phone Number * 
+                            <span id="verifiedBadge" style="display: none;" class="verified-badge">
+                                ✓ Verified
+                            </span>
+                        </label>
+                        <input type="tel" 
+                               id="customerPhone" 
+                               name="customer_phone" 
+                               required 
+                               placeholder="10-digit mobile number" 
+                               pattern="[0-9]{10}"
+                               maxlength="10">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Delivery Address *</label>
+                    <textarea name="delivery_address" rows="3" required placeholder="House/Flat No., Street, Landmark"></textarea>
+                </div>
+                
+                <div class="row">
+                    <div class="form-group">
+                        <label>City *</label>
+                        <input type="text" name="delivery_city" required placeholder="City">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Pincode *</label>
+                        <input type="text" name="delivery_pincode" required placeholder="6-digit pincode" pattern="[0-9]{6}" maxlength="6">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Delivery Instructions (Optional)</label>
+                    <textarea name="delivery_instructions" rows="2" placeholder="E.g., Call before delivery, Gate code, etc."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Payment Method *</label>
+                    <select name="payment_method" id="paymentMethod" required>
+                        <option value="COD">💵 Cash on Delivery (COD)</option>
+                        <option value="Online">💳 Online Payment</option>
+                        <option value="UPI">📱 UPI Payment</option>
+                    </select>
+                </div>
+
+                <!-- OTP Section (shown for Online/UPI payment) -->
+                <div id="otpSection" class="otp-section">
+                    <h3>📱 OTP Verification Required</h3>
+                    <p>For online payments, we need to verify your phone number.</p>
+                    
+                    <div id="otpAlert"></div>
+                    
+                    <div id="sendOtpDiv">
+                        <button type="button" class="btn btn-secondary" onclick="sendOTP()">
+                            Send OTP
+                        </button>
+                    </div>
+                    
+                    <div id="verifyOtpDiv" style="display: none; margin-top: 1rem;">
+                        <label>Enter 6-digit OTP:</label>
+                        <input type="text" 
+                               id="otpInput" 
+                               class="otp-input" 
+                               maxlength="6" 
+                               pattern="[0-9]{6}"
+                               placeholder="000000">
+                        <button type="button" class="btn btn-secondary" onclick="verifyOTP()">
+                            Verify OTP
+                        </button>
+                        <button type="button" class="btn" onclick="sendOTP()">
+                            Resend OTP
+                        </button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn" id="submitBtn">
+                    Place Order - ₹{{ "%.2f"|format(total) }}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let isPhoneVerified = false;
+        const paymentMethod = document.getElementById('paymentMethod');
+        const otpSection = document.getElementById('otpSection');
+        const submitBtn = document.getElementById('submitBtn');
+        const checkoutForm = document.getElementById('checkoutForm');
+
+        // Show/hide OTP section based on payment method
+        paymentMethod.addEventListener('change', function() {
+            if (this.value === 'Online' || this.value === 'UPI') {
+                otpSection.classList.add('active');
+                isPhoneVerified = false;
+                document.getElementById('verifiedBadge').style.display = 'none';
+            } else {
+                otpSection.classList.remove('active');
+                isPhoneVerified = true;
+            }
+        });
+
+        // Send OTP
+        async function sendOTP() {
+            const phone = document.getElementById('customerPhone').value;
+            
+            if (!phone || phone.length !== 10) {
+                showAlert('Please enter a valid 10-digit phone number', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/send_otp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `customer_phone=${phone}`
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`OTP sent to ${phone}`, 'success');
+                    document.getElementById('sendOtpDiv').style.display = 'none';
+                    document.getElementById('verifyOtpDiv').style.display = 'block';
+                } else {
+                    showAlert(data.message || 'Failed to send OTP', 'error');
+                }
+            } catch (error) {
+                showAlert('Error sending OTP. Please try again.', 'error');
+            }
+        }
+
+        // Verify OTP
+        async function verifyOTP() {
+            const phone = document.getElementById('customerPhone').value;
+            const otp = document.getElementById('otpInput').value;
+
+            if (!otp || otp.length !== 6) {
+                showAlert('Please enter the 6-digit OTP', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/verify_otp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `customer_phone=${phone}&otp=${otp}`
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    isPhoneVerified = true;
+                    showAlert('Phone number verified successfully! ✓', 'success');
+                    document.getElementById('verifiedBadge').style.display = 'inline-block';
+                    document.getElementById('verifyOtpDiv').style.display = 'none';
+                    submitBtn.disabled = false;
+                } else {
+                    showAlert(data.message || 'Invalid OTP', 'error');
+                }
+            } catch (error) {
+                showAlert('Error verifying OTP. Please try again.', 'error');
+            }
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('otpAlert');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+        }
+
+        // Form submission validation
+        checkoutForm.addEventListener('submit', function(e) {
+            const payment = paymentMethod.value;
+            
+            if ((payment === 'Online' || payment === 'UPI') && !isPhoneVerified) {
+                e.preventDefault();
+                showAlert('Please verify your phone number with OTP first', 'error');
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

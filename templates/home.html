@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Home - VAPU{% endblock %}
+
+{% block content %}
+<div class="hero" style="text-align: center; padding: 4rem 0; background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%); border-radius: 24px; margin-bottom: 3rem; box-shadow: var(--shadow);">
+    <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Welcome to VAPU</h1>
+    <p style="font-size: 1.2rem; color: var(--text-light); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">Discover amazing products with unbeatable quality and service. Your satisfaction is our priority.</p>
+    {% if not user %}
+        <a href="{{ url_for('register') }}" class="btn btn-success">Get Started</a>
+    {% endif %}
+</div>
+
+<section>
+    <h2 style="text-align: center; margin-bottom: 2rem; font-size: 2.5rem; color: var(--text);">Featured Products</h2>
+    
+    {% if products %}
+        <div class="grid">
+            {% for product in products %}
+                <div class="card" style="transition: all 0.3s ease; cursor: pointer;" onclick="window.location.href='{{ url_for('product_detail', product_id=product[0]) }}'">
+                    {% if product[4] %}
+                        <img src="{{ product[4] }}" alt="{{ product[1] }}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;">
+                    {% else %}
+                        <div style="width: 100%; height: 200px; background: var(--gradient); border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">No Image</div>
+                    {% endif %}
+                    
+                    <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text);">{{ product[1] }}</h3>
+                    
+                    {% if product[2] %}
+                        <p style="color: var(--text-light); margin-bottom: 1rem;">{{ product[2][:100] }}{% if product[2]|length > 100 %}...{% endif %}</p>
+                    {% endif %}
+                    
+                    <div class="price">₹{{ "%.2f"|format(product[3]) }}</div>
+                    
+                    <a href="{{ url_for('product_detail', product_id=product[0]) }}" class="btn" style="width: 100%; margin-top: 1rem;">View Details</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card text-center">
+            <h3>No Products Available</h3>
+            <p style="color: var(--text-light);">Check back later for new products!</p>
+            {% if user and user.is_admin %}
+                <a href="{{ url_for('add_product') }}" class="btn mt-2">Add First Product</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
+<style>
+.hero {
+    animation: fadeIn 1s ease-out;
+}
+
+.card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(30px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+</style>
+{% endblock %}

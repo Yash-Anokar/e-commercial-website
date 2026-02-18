@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Add Product - E-Commerce{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <h1 style="margin-bottom: 2rem;">Add New Product</h1>
+    
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                <div class="form-group">
+                    <label for="name">Product Name *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="4" placeholder="Product description..."></textarea>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="price">Price (₹) *</label>
+                        <input type="number" id="price" name="price" step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="stock">Stock Quantity</label>
+                        <input type="number" id="stock" name="stock" min="0" value="0">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="category_id">Category</label>
+                    <select id="category_id" name="category_id">
+                        <option value="">No Category</option>
+                        <option value="">Toys</option>
+
+                        {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="image">Image URL</label>
+                    <input type="url" id="image" name="image" placeholder="https://example.com/image.jpg">
+                    <small style="color: #666;">Enter a URL to an image online</small>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" class="btn">Add Product</button>
+                    <a href="{{ url_for('home') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media (max-width: 768px) {
+        div[style*="grid-template-columns: 1fr 1fr"] {
+            grid-template-columns: 1fr !important;
+        }
+        div[style*="display: flex; gap: 1rem"] {
+            flex-direction: column;
+        }
+        .btn {
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}

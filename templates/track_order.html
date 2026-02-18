@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Order - VAPC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            color: #1f2937;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+
+        .tracking-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .tracking-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            letter-spacing: 2px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin: 1rem 0;
+        }
+
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-confirmed { background: #dbeafe; color: #1e40af; }
+        .status-processing { background: #e0e7ff; color: #3730a3; }
+        .status-packed { background: #ddd6fe; color: #5b21b6; }
+        .status-shipped { background: #fce7f3; color: #9f1239; }
+        .status-out_for_delivery { background: #ffedd5; color: #9a3412; }
+        .status-delivered { background: #d1fae5; color: #065f46; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+
+        .progress-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 3rem 0;
+            position: relative;
+            padding: 0 2rem;
+        }
+
+        .progress-line {
+            position: absolute;
+            top: 25px;
+            left: 2rem;
+            right: 2rem;
+            height: 4px;
+            background: #e5e7eb;
+            z-index: 0;
+        }
+
+        .progress-line-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.5s ease;
+        }
+
+        .progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1;
+            position: relative;
+        }
+
+        .step-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .step-icon.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: #667eea;
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .step-icon.completed {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .step-label {
+            font-size: 0.85rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-align: center;
+            max-width: 100px;
+        }
+
+        .step-label.active {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .step-label.completed {
+            color: #10b981;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .info-item {
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            color: #1f2937;
+            font-weight: 600;
+        }
+
+        .order-items {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+        }
+
+        .order-items h2 {
+            color: #1f2937;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        @media (max-width: 768px) {
+            .progress-bar {
+                flex-direction: column;
+                gap: 2rem;
+                padding: 0;
+            }
+
+            .progress-line {
+                display: none;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tracking-number {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Tracking Header -->
+        <div class="tracking-header">
+            <h1>📦 Order Tracking</h1>
+            <div class="tracking-number">{{ order['tracking_number'] }}</div>
+            <span class="status-badge status-{{ order['status'] }}">
+                {{ order['status'].replace('_', ' ').title() }}
+            </span>
+        </div>
+
+        <div class="card">
+            <!-- Progress Tracker -->
+            <div class="progress-bar">
+                <div class="progress-line">
+                    <div class="progress-line-fill" style="width: 
+                        {% if order['status'] in ['pending', 'confirmed'] %}25%
+                        {% elif order['status'] in ['processing', 'packed'] %}50%
+                        {% elif order['status'] == 'shipped' %}75%
+                        {% elif order['status'] in ['out_for_delivery', 'delivered'] %}100%
+                        {% else %}0%
+                        {% endif %}">
+                    </div>
+                </div>
+
+                <div class="progress-step">
+                    <div class="step-icon {% if order['status'] in ['confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'pending' %}active{% endif %}">
+                        ✓
+                    </div>
+                    <div class="step-label {% if order['status'] in ['confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'pending' %}active{% endif %}">
+                        Order<br>Placed
+                    </div>
+                </div>
+
+                <div class="progress-step">
+                    <div class="step-icon {% if order['status'] in ['processing', 'packed', 'shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'confirmed' %}active{% endif %}">
+                        📋
+                    </div>
+                    <div class="step-label {% if order['status'] in ['processing', 'packed', 'shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'confirmed' %}active{% endif %}">
+                        Confirmed
+                    </div>
+                </div>
+
+                <div class="progress-step">
+                    <div class="step-icon {% if order['status'] in ['packed', 'shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'processing' %}active{% endif %}">
+                        📦
+                    </div>
+                    <div class="step-label {% if order['status'] in ['packed', 'shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'processing' %}active{% endif %}">
+                        Processing
+                    </div>
+                </div>
+
+                <div class="progress-step">
+                    <div class="step-icon {% if order['status'] in ['shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'packed' %}active{% endif %}">
+                        🚚
+                    </div>
+                    <div class="step-label {% if order['status'] in ['shipped', 'out_for_delivery', 'delivered'] %}completed{% elif order['status'] == 'packed' %}active{% endif %}">
+                        Shipped
+                    </div>
+                </div>
+
+                <div class="progress-step">
+                    <div class="step-icon {% if order['status'] == 'delivered' %}completed{% elif order['status'] == 'out_for_delivery' %}active{% endif %}">
+                        ✓
+                    </div>
+                    <div class="step-label {% if order['status'] == 'delivered' %}completed{% elif order['status'] == 'out_for_delivery' %}active{% endif %}">
+                        Delivered
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Information -->
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Order ID</div>
+                    <div class="info-value">#{{ order['id'] }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Order Date</div>
+                    <div class="info-value">{{ order['created_at'].strftime('%d %b %Y, %I:%M %p') }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Total Amount</div>
+                    <div class="info-value">₹{{ "%.2f"|format(order['total_amount']) }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Payment Method</div>
+                    <div class="info-value">{{ order['payment_method'] or 'COD' }}</div>
+                </div>
+            </div>
+
+            <!-- Delivery Address -->
+            {% if order['delivery_address'] %}
+            <div class="info-item" style="margin: 2rem 0;">
+                <div class="info-label">📍 Delivery Address</div>
+                <div class="info-value">
+                    {{ order['customer_name'] }}<br>
+                    {{ order['delivery_address'] }}<br>
+                    {{ order['delivery_city'] }}, {{ order['delivery_pincode'] }}<br>
+                    Phone: {{ order['customer_phone'] }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Order Items -->
+            <div class="order-items">
+                <h2>📦 Order Items</h2>
+                <p style="font-size: 1.1rem; color: #1f2937; font-weight: 500;">
+                    {{ order['items'] }}
+                </p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                <a href="{{ url_for('orders') }}" class="btn btn-secondary">
+                    ← Back to Orders
+                </a>
+                <a href="{{ url_for('home') }}" class="btn">
+                    Continue Shopping
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

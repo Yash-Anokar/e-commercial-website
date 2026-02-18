@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Orders - VAPC Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #1f2937;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        .filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-btn.active {
+            background: #6366f1;
+            color: white;
+            border-color: #6366f1;
+        }
+
+        .orders-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+
+        .order-card:hover {
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f3f4f6;
+        }
+
+        .order-id {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .tracking {
+            font-size: 0.9rem;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+        }
+
+        .order-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .order-items {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-confirmed { background: #dbeafe; color: #1e40af; }
+        .status-processing { background: #e0e7ff; color: #3730a3; }
+        .status-packed { background: #ddd6fe; color: #5b21b6; }
+        .status-shipped { background: #fce7f3; color: #9f1239; }
+        .status-out_for_delivery { background: #ffedd5; color: #9a3412; }
+        .status-delivered { background: #d1fae5; color: #065f46; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Order Management</h1>
+        
+        <!-- Filters -->
+        <div class="filters">
+            <button class="filter-btn active" onclick="filterOrders('all')">All Orders</button>
+            <button class="filter-btn" onclick="filterOrders('pending')">Pending</button>
+            <button class="filter-btn" onclick="filterOrders('confirmed')">Confirmed</button>
+            <button class="filter-btn" onclick="filterOrders('shipped')">Shipped</button>
+            <button class="filter-btn" onclick="filterOrders('delivered')">Delivered</button>
+        </div>
+
+        <!-- Orders Grid -->
+        <div class="orders-grid">
+            {% if orders %}
+                {% for order in orders %}
+                <div class="order-card" data-status="{{ order['status'] }}">
+                    <div class="order-header">
+                        <div>
+                            <div class="order-id">Order #{{ order['id'] }}</div>
+                            <div class="tracking">📍 {{ order['tracking_number'] or 'No tracking' }}</div>
+                        </div>
+                        <span class="status-badge status-{{ order['status'] }}">
+                            {{ order['status'].replace('_', ' ').title() }}
+                        </span>
+                    </div>
+
+                    <div class="order-details">
+                        <div class="detail-item">
+                            <span class="detail-label">Customer</span>
+                            <span class="detail-value">{{ order['customer_name'] or order['username'] }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Phone</span>
+                            <span class="detail-value">{{ order['customer_phone'] or 'Not provided' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Payment</span>
+                            <span class="detail-value">{{ order['payment_method'] or 'COD' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Total</span>
+                            <span class="detail-value">₹{{ "%.2f"|format(order['total_amount']) }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Date</span>
+                            <span class="detail-value">{{ order['created_at'].strftime('%d %b %Y') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="order-items">
+                        <strong>Items:</strong> {{ order['items'] }}
+                    </div>
+
+                    {% if order['delivery_address'] %}
+                    <div class="detail-item" style="margin-bottom: 1rem;">
+                        <span class="detail-label">📍 Delivery Address</span>
+                        <span class="detail-value">
+                            {{ order['delivery_address'] }}, {{ order['delivery_city'] }} - {{ order['delivery_pincode'] }}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    <div class="action-buttons">
+                        <a href="{{ url_for('admin_order_detail', order_id=order['id']) }}" class="btn btn-primary">
+                            View Details
+                        </a>
+                        <button class="btn btn-success" onclick="openStatusModal({{ order['id'] }}, '{{ order['status'] }}')">
+                            Update Status
+                        </button>
+                        <button class="btn btn-danger" onclick="printInvoice({{ order['id'] }})">
+                            Print Invoice
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="order-card">
+                    <p style="text-align: center; color: #6b7280;">No orders found</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Status Update Modal -->
+    <div id="statusModal" class="modal">
+        <div class="modal-content">
+            <h2>Update Order Status</h2>
+            <form id="statusForm" method="POST">
+                <label>New Status:</label>
+                <select name="status" id="statusSelect">
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="processing">Processing</option>
+                    <option value="packed">Packed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                
+                <label>Notes (Optional):</label>
+                <textarea name="notes" rows="3" placeholder="Add any notes about this status update..."></textarea>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="submit" class="btn btn-success">Update</button>
+                    <button type="button" class="btn btn-danger" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function filterOrders(status) {
+            const cards = document.querySelectorAll('.order-card');
+            const buttons = document.querySelectorAll('.filter-btn');
+            
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            cards.forEach(card => {
+                if (status === 'all' || card.dataset.status === status) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function openStatusModal(orderId, currentStatus) {
+            const modal = document.getElementById('statusModal');
+            const form = document.getElementById('statusForm');
+            const select = document.getElementById('statusSelect');
+            
+            form.action = `/admin/order/${orderId}/update_status`;
+            select.value = currentStatus;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('statusModal').classList.remove('active');
+        }
+
+        function printInvoice(orderId) {
+            window.open(`/admin/order/${orderId}/invoice`, '_blank');
+        }
+
+        // Close modal on outside click
+        document.getElementById('statusModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+</body>
+</html>
