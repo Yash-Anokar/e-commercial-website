@@ -23,14 +23,15 @@ SITE_TAGLINE = "Pure Ayurvedic Products from Nature"
 
 # MySQL Database configuration - Use environment variables for production
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', 'Yash#826298'),
-    'database': os.getenv('DB_NAME', 'vasundhara_agro_db'),
-    'port': int(os.getenv('DB_PORT', 3306)),
+    'host': os.getenv('MYSQLHOST'),
+    'user': os.getenv('MYSQLUSER'),
+    'password': os.getenv('MYSQLPASSWORD'),
+    'database': os.getenv('MYSQLDATABASE'),
+    'port': int(os.getenv('MYSQLPORT', 3306)),
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }
+
 
 # OTP storage (in-memory for development, use Redis in production)
 otp_storage = {}
