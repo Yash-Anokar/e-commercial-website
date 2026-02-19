@@ -7,22 +7,27 @@ import random
 import string
 from datetime import datetime, timedelta
 from contextlib import contextmanager
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'vasundhara-agro-secret-key-2024'
+# Use environment variable for secret key, fallback to default for local development
+app.secret_key = os.getenv('SECRET_KEY', 'vasundhara-agro-secret-key-2024')
 
 # Site Configuration
 SITE_NAME = "Vasundhara Agro Processing Center"
 SITE_LOCATION = "Anjangaon Surji"
 SITE_TAGLINE = "Pure Ayurvedic Products from Nature"
 
-# MySQL Database configuration
+# MySQL Database configuration - Use environment variables for production
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': 'Yash#826298',
-    'database': 'vasundhara_agro_db',
-    'port': 3306,
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'user': os.getenv('DB_USER', 'root'),
+    'password': os.getenv('DB_PASSWORD', 'Yash#826298'),
+    'database': os.getenv('DB_NAME', 'vasundhara_agro_db'),
+    'port': int(os.getenv('DB_PORT', 3306)),
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }
