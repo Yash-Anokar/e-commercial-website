@@ -1,71 +1,286 @@
 {% extends "base.html" %}
 
-{% block title %}{{ product[1] }} - E-Commerce{% endblock %}
+{% block title %}{{ product.name }} | {{ site_name }}{% endblock %}
 
-{% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">← Back to Products</a>
-</div>
-
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
-    <!-- Product Image -->
-    <div>
-        <div class="card">
-            <div style="height: 400px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden;">
-                {% if product[4] %}
-                    <img src="{{ product[4] }}" alt="{{ product[1] }}" style="max-width: 100%; max-height: 100%; object-fit: cover;">
-                {% else %}
-                    <span style="color: #6c757d; font-size: 1.2rem;">No Image Available</span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Product Details -->
-    <div>
-        <div class="card">
-            <div class="card-body">
-                <h1 style="margin-bottom: 0.5rem;">{{ product[1] }}</h1>
-                <p style="color: #6c757d; margin-bottom: 1rem;">Category: {{ product[5] }}</p>
-                
-                <div style="margin-bottom: 1.5rem;">
-                    <span style="font-size: 2rem; font-weight: bold; color: #007bff;">₹{{ "%.2f"|format(product[3]) }}</span>
-                </div>
-                
-                {% if product[2] %}
-                    <div style="margin-bottom: 1.5rem;">
-                        <h3 style="margin-bottom: 0.5rem;">Description</h3>
-                        <p style="color: #666; line-height: 1.6;">{{ product[2] }}</p>
-                    </div>
-                {% endif %}
-                
-                {% if user %}
-                    <form method="POST" action="{{ url_for('add_to_cart', product_id=product[0]) }}" style="display: flex; gap: 1rem; align-items: end;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="quantity">Quantity</label>
-                            <input type="number" id="quantity" name="quantity" value="1" min="1" style="width: 80px;">
-                        </div>
-                        <button type="submit" class="btn">Add to Cart</button>
-                    </form>
-                {% else %}
-                    <div style="padding: 1rem; background: #f8f9fa; border-radius: 4px; text-align: center;">
-                        <p style="margin-bottom: 1rem;">Please login to add items to cart</p>
-                        <a href="{{ url_for('login') }}" class="btn">Login</a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
+{% block extra_head %}
 <style>
-    @media (max-width: 768px) {
-        div[style*="grid-template-columns: 1fr 1fr"] {
-            display: block !important;
+    .breadcrumb {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+    }
+
+    .breadcrumb a {
+        text-decoration: none;
+        color: var(--primary);
+        font-weight: 700;
+    }
+
+    .product-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        align-items: start;
+        margin-bottom: 1.8rem;
+    }
+
+    .product-gallery {
+        overflow: hidden;
+        padding: 0;
+    }
+
+    .product-gallery-media {
+        min-height: 430px;
+        background:
+            linear-gradient(135deg, rgba(31, 106, 73, 0.12), rgba(197, 121, 44, 0.15)),
+            rgba(239, 229, 210, 0.78);
+        display: grid;
+        place-items: center;
+    }
+
+    .product-gallery-media img {
+        width: 100%;
+        height: 100%;
+        min-height: 430px;
+        object-fit: cover;
+    }
+
+    .product-gallery-fallback {
+        text-align: center;
+        color: var(--primary);
+        font-family: Cambria, Georgia, serif;
+        font-size: 1.5rem;
+        padding: 1.5rem;
+    }
+
+    .product-summary {
+        display: grid;
+        gap: 1.15rem;
+    }
+
+    .product-summary h1 {
+        font-size: clamp(2.2rem, 4vw, 3.4rem);
+    }
+
+    .detail-points {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.8rem;
+    }
+
+    .detail-points .subtle-panel {
+        min-height: 100%;
+    }
+
+    .purchase-box {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .purchase-form {
+        display: flex;
+        gap: 0.9rem;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+
+    .purchase-form .form-group {
+        min-width: 140px;
+        margin-bottom: 0;
+    }
+
+    .related-header {
+        margin-bottom: 1rem;
+    }
+
+    .related-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .related-card-media {
+        min-height: 180px;
+        background:
+            linear-gradient(135deg, rgba(31, 106, 73, 0.12), rgba(197, 121, 44, 0.18)),
+            rgba(239, 229, 210, 0.75);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+    }
+
+    .related-card-media img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+    }
+
+    .related-card-body {
+        display: grid;
+        gap: 0.8rem;
+        padding: 0 1.1rem 1.1rem;
+    }
+
+    @media (max-width: 960px) {
+        .product-layout {
+            grid-template-columns: 1fr;
         }
-        div[style*="grid-template-columns: 1fr 1fr"] > div:first-child {
-            margin-bottom: 2rem;
+    }
+
+    @media (max-width: 720px) {
+        .detail-points {
+            grid-template-columns: 1fr;
+        }
+
+        .purchase-form {
+            flex-direction: column;
+            align-items: stretch;
         }
     }
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="{{ url_for('home') }}">Store</a>
+    <span>/</span>
+    <span>{{ product.category_name }}</span>
+    <span>/</span>
+    <span>{{ product.name }}</span>
+</div>
+
+<section class="product-layout">
+    <div class="card product-gallery">
+        <div class="product-gallery-media">
+            {% if product.image %}
+                <img src="{{ product.image }}" alt="{{ product.name }}">
+            {% else %}
+                <div class="product-gallery-fallback">{{ product.name }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card product-summary">
+        <div class="inline-actions">
+            <span class="pill pill-neutral">{{ product.category_name }}</span>
+            <span class="pill pill-{{ product.stock_tone }}">{{ product.stock_label }}</span>
+        </div>
+
+        <div>
+            <span class="eyebrow">Product Focus</span>
+            <h1>{{ product.name }}</h1>
+        </div>
+
+        <p class="lead">
+            {{ product.short_description if product.short_description else 'A dependable product listing designed for serious online selling.' }}
+        </p>
+
+        <div class="price">Rs.{{ "%.2f"|format(product.price) }}</div>
+
+        <div class="detail-points">
+            <div class="subtle-panel">
+                <strong>Visible stock</strong>
+                Customers can see live availability before placing an order.
+            </div>
+            <div class="subtle-panel">
+                <strong>Checkout confidence</strong>
+                OTP verification protects online and UPI payments.
+            </div>
+            <div class="subtle-panel">
+                <strong>Tracked delivery</strong>
+                Orders generate a tracking number for customer follow-up.
+            </div>
+        </div>
+
+        <div class="subtle-panel">
+            <h3 class="mb-1">Description</h3>
+            <p>
+                {{ product.description if product.description else 'Add a fuller product description from the admin panel to increase trust and improve conversions.' }}
+            </p>
+        </div>
+
+        <div class="purchase-box">
+            {% if user %}
+                {% if product.in_stock %}
+                    <form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}" class="purchase-form">
+                        <div class="form-group">
+                            <label for="quantity">Quantity</label>
+                            <input
+                                type="number"
+                                id="quantity"
+                                name="quantity"
+                                min="1"
+                                max="{{ product.stock }}"
+                                value="1"
+                                required
+                            >
+                        </div>
+                        <input type="hidden" name="next" value="{{ url_for('product_detail', product_id=product.id) }}">
+                        <button type="submit" class="btn">Add to Cart</button>
+                        <a href="{{ url_for('cart') }}" class="btn btn-secondary">View Cart</a>
+                    </form>
+                    {% if product.low_stock %}
+                        <span class="pill pill-warning">Low stock: only {{ product.stock }} left</span>
+                    {% endif %}
+                {% else %}
+                    <div class="subtle-panel">
+                        <h3 class="mb-1">Currently unavailable</h3>
+                        <p>This product cannot be added to cart until stock is replenished.</p>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="subtle-panel">
+                    <h3 class="mb-1">Login required for purchase</h3>
+                    <p class="mb-2">Create an account or sign in to start your order.</p>
+                    <div class="inline-actions">
+                        <a href="{{ url_for('login') }}" class="btn">Login</a>
+                        <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% if related_products %}
+<section>
+    <div class="related-header">
+        <span class="eyebrow">Cross-Sell Opportunity</span>
+        <h2>Related products customers can discover next</h2>
+    </div>
+
+    <div class="product-grid">
+        {% for related in related_products %}
+            <article class="card related-card">
+                <a class="related-card-media" href="{{ url_for('product_detail', product_id=related.id) }}">
+                    {% if related.image %}
+                        <img src="{{ related.image }}" alt="{{ related.name }}">
+                    {% else %}
+                        <div class="product-gallery-fallback">{{ related.name }}</div>
+                    {% endif %}
+                </a>
+                <div class="related-card-body">
+                    <div class="inline-actions">
+                        <span class="pill pill-neutral">{{ related.category_name }}</span>
+                        <span class="pill pill-{{ related.stock_tone }}">{{ related.stock_label }}</span>
+                    </div>
+                    <div>
+                        <h3>{{ related.name }}</h3>
+                        <p class="lead">{{ related.short_description }}</p>
+                    </div>
+                    <div class="inline-actions" style="justify-content: space-between; align-items: center;">
+                        <span class="price">Rs.{{ "%.2f"|format(related.price) }}</span>
+                        <a href="{{ url_for('product_detail', product_id=related.id) }}" class="btn btn-secondary btn-sm">View</a>
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}

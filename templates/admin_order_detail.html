@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Order Detail | {{ site_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-order-layout {
+        display: grid;
+        gap: 1.2rem;
+    }
+
+    .item-grid,
+    .history-grid {
+        display: grid;
+        gap: 0.9rem;
+    }
+
+    .item-card strong,
+    .history-card strong {
+        display: block;
+        margin-bottom: 0.2rem;
+        font-family: Cambria, Georgia, serif;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Admin Order Detail</span>
+        <h1>Order #{{ order.id }}</h1>
+        <p class="lead">Tracking {{ order.tracking_number or 'Pending assignment' }} for {{ order.customer_name or order.username }}</p>
+    </div>
+    <div class="inline-actions">
+        <a href="{{ url_for('admin_orders') }}" class="btn btn-secondary">Back to Admin Orders</a>
+    </div>
+</div>
+
+<section class="admin-order-layout">
+    <div class="metric-grid">
+        <div class="metric-card">
+            <span class="metric-label">Status</span>
+            <span class="metric-value" style="font-size: 1.2rem;">{{ order.status.replace('_', ' ')|title }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Payment</span>
+            <span class="metric-value" style="font-size: 1.2rem;">{{ order.payment_method }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Total</span>
+            <span class="metric-value">Rs.{{ "%.2f"|format(order.total_amount) }}</span>
+        </div>
+    </div>
+
+    <div class="field-grid">
+        <div class="card">
+            <span class="eyebrow">Customer</span>
+            <h2>{{ order.customer_name or order.username }}</h2>
+            <div class="subtle-panel mt-2">
+                <strong>Email</strong>
+                <p>{{ order.email or 'Not provided' }}</p>
+                <strong>Phone</strong>
+                <p>{{ order.customer_phone or 'Not provided' }}</p>
+                <strong>Address</strong>
+                <p>
+                    {{ order.delivery_address or 'Not provided' }}<br>
+                    {{ order.delivery_city or '' }} {{ order.delivery_pincode or '' }}
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <span class="eyebrow">Order Notes</span>
+            <h2>Delivery and payment summary</h2>
+            <div class="subtle-panel mt-2">
+                <strong>Instructions</strong>
+                <p>{{ order.delivery_instructions or 'No delivery instructions' }}</p>
+                <strong>Placed at</strong>
+                <p>{{ order.created_at.strftime('%d %b %Y, %I:%M %p') if order.created_at else 'N/A' }}</p>
+                <strong>Last updated</strong>
+                <p>{{ order.updated_at.strftime('%d %b %Y, %I:%M %p') if order.updated_at else 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <span class="eyebrow">Ordered Items</span>
+        <h2>Items in this order</h2>
+        <div class="item-grid mt-2">
+            {% for item in items %}
+                <div class="subtle-panel item-card">
+                    <strong>{{ item.name }}</strong>
+                    <span>Quantity: {{ item.quantity }}</span><br>
+                    <span>Price: Rs.{{ "%.2f"|format(item.price) }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <span class="eyebrow">Status History</span>
+        <h2>Tracking updates</h2>
+        <div class="history-grid mt-2">
+            {% if history %}
+                {% for event in history %}
+                    <div class="subtle-panel history-card">
+                        <strong>{{ event.status.replace('_', ' ')|title }}</strong>
+                        <span>Updated by {{ event.updated_by or 'System' }}</span><br>
+                        <span>{{ event.created_at.strftime('%d %b %Y, %I:%M %p') if event.created_at else 'N/A' }}</span>
+                        {% if event.notes %}
+                            <p class="mt-1">{{ event.notes }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="subtle-panel">No status history available yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,34 +1,125 @@
 {% extends "base.html" %}
 
-{% block title %}Orders - E-Shop{% endblock %}
+{% block title %}My Orders | {{ site_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .order-dashboard {
+        display: grid;
+        gap: 1.4rem;
+    }
+
+    .order-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .order-card {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .order-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .order-meta {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .order-meta .subtle-panel strong {
+        display: block;
+        margin-bottom: 0.2rem;
+        font-family: Cambria, Georgia, serif;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<h1>Your Orders</h1>
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Customer Dashboard</span>
+        <h1>Your order history and purchase overview</h1>
+        <p class="lead">This page now acts like a proper account dashboard with totals, live statuses, and tracking access.</p>
+    </div>
+    <div class="inline-actions">
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Keep Shopping</a>
+    </div>
+</div>
 
-{% if orders %}
-    <table>
-        <thead>
-            <tr>
-                <th>Order #</th>
-                <th>Product</th>
-                <th>Quantity</th>
-                <th>Total Price</th>
-            </tr>
-        </thead>
-        <tbody>
+<section class="order-dashboard">
+    <div class="metric-grid">
+        <div class="metric-card">
+            <span class="metric-label">Total Orders</span>
+            <span class="metric-value">{{ order_stats.total_orders }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Total Spent</span>
+            <span class="metric-value">Rs.{{ "%.2f"|format(order_stats.total_spent) }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Delivered</span>
+            <span class="metric-value">{{ order_stats.delivered_orders }}</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Active Orders</span>
+            <span class="metric-value">{{ order_stats.active_orders }}</span>
+        </div>
+    </div>
+
+    {% if orders %}
+        <div class="order-grid">
             {% for order in orders %}
-                <tr>
-                    <td>#{{ order[0] }}</td>
-                    <td>{{ order[1] }}</td>
-                    <td>{{ order[2] }}</td>
-                    <td>₹{{ "%.2f"|format(order[3]) }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p>No orders found.</p>
-{% endif %}
+                <article class="card order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <span class="eyebrow">Order #{{ order.id }}</span>
+                            <h2>Tracking {{ order.tracking_number or 'Pending assignment' }}</h2>
+                            <p class="lead">Placed on {{ order.created_at.strftime('%d %b %Y, %I:%M %p') if order.created_at else 'N/A' }}</p>
+                        </div>
+                        <div class="inline-actions">
+                            <span class="pill pill-{{ 'success' if order.status == 'delivered' else 'warning' if order.status in ['pending', 'confirmed', 'processing', 'packed'] else 'info' if order.status in ['shipped', 'out_for_delivery'] else 'danger' }}">
+                                {{ order.status.replace('_', ' ')|title }}
+                            </span>
+                            {% if order.tracking_number %}
+                                <a href="{{ url_for('track_order', tracking_number=order.tracking_number) }}" class="btn btn-secondary btn-sm">Track Order</a>
+                            {% endif %}
+                        </div>
+                    </div>
 
-<p><a href="{{ url_for('home') }}">&larr; Continue Shopping</a></p>
+                    <div class="order-meta">
+                        <div class="subtle-panel">
+                            <strong>Items</strong>
+                            <span>{{ order.items }}</span>
+                        </div>
+                        <div class="subtle-panel">
+                            <strong>Payment</strong>
+                            <span>{{ order.payment_method }}</span>
+                        </div>
+                        <div class="subtle-panel">
+                            <strong>Delivery</strong>
+                            <span>{{ order.delivery_city }} - {{ order.delivery_pincode }}</span>
+                        </div>
+                        <div class="subtle-panel">
+                            <strong>Total</strong>
+                            <span>Rs.{{ "%.2f"|format(order.total_amount) }}</span>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card empty-state">
+            <h2>No orders yet</h2>
+            <p>Once a customer places an order, this dashboard will show history, tracking, and spend totals.</p>
+            <a href="{{ url_for('home') }}" class="btn">Shop Products</a>
+        </div>
+    {% endif %}
+</section>
 {% endblock %}

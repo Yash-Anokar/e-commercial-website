@@ -1,71 +1,404 @@
 {% extends "base.html" %}
 
-{% block title %}Home - VAPU{% endblock %}
+{% block title %}{{ site_name }} | Commerce Ready Store{% endblock %}
+
+{% block extra_head %}
+<style>
+    .hero-layout {
+        display: grid;
+        grid-template-columns: 1.4fr 0.9fr;
+        gap: 1.5rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .hero-copy {
+        padding: 2rem;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 249, 239, 0.76)),
+            radial-gradient(circle at top left, rgba(31, 106, 73, 0.12), transparent 40%);
+    }
+
+    .hero-copy h1 {
+        font-size: clamp(2.4rem, 5vw, 4.4rem);
+        margin-bottom: 0.9rem;
+    }
+
+    .hero-copy p {
+        max-width: 52rem;
+    }
+
+    .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin: 1.5rem 0 1.75rem;
+    }
+
+    .hero-note {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .hero-note-item {
+        padding: 1rem 1.1rem;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.74);
+        border: 1px solid rgba(216, 203, 183, 0.68);
+    }
+
+    .hero-note-item strong {
+        display: block;
+        margin-bottom: 0.2rem;
+        font-family: Cambria, Georgia, serif;
+        font-size: 1.1rem;
+    }
+
+    .filter-card form {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .catalog-header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.2rem;
+        flex-wrap: wrap;
+    }
+
+    .catalog-header p {
+        color: var(--muted);
+    }
+
+    .product-card {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 0;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .product-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .product-media {
+        display: block;
+        position: relative;
+        min-height: 220px;
+        background:
+            linear-gradient(135deg, rgba(31, 106, 73, 0.12), rgba(197, 121, 44, 0.2)),
+            rgba(239, 229, 210, 0.75);
+        overflow: hidden;
+        text-decoration: none;
+    }
+
+    .product-media img {
+        width: 100%;
+        height: 100%;
+        min-height: 220px;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .product-card:hover .product-media img {
+        transform: scale(1.04);
+    }
+
+    .product-fallback {
+        min-height: 220px;
+        display: grid;
+        place-items: center;
+        color: var(--primary);
+        font-family: Cambria, Georgia, serif;
+        font-size: 1.2rem;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .product-content {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.95rem;
+        padding: 0 1.3rem 1.3rem;
+    }
+
+    .product-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        margin-top: -0.2rem;
+    }
+
+    .product-title {
+        font-size: 1.4rem;
+        text-decoration: none;
+    }
+
+    .product-title:hover {
+        color: var(--primary);
+    }
+
+    .product-copy {
+        color: var(--muted);
+        flex: 1;
+    }
+
+    .product-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .quick-cart-form {
+        display: inline-flex;
+    }
+
+    .trust-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1.4rem;
+    }
+
+    .trust-grid .subtle-panel strong {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-family: Cambria, Georgia, serif;
+    }
+
+    @media (max-width: 960px) {
+        .hero-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .hero-copy {
+            padding: 1.4rem;
+        }
+
+        .trust-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="hero" style="text-align: center; padding: 4rem 0; background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%); border-radius: 24px; margin-bottom: 3rem; box-shadow: var(--shadow);">
-    <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Welcome to VAPU</h1>
-    <p style="font-size: 1.2rem; color: var(--text-light); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">Discover amazing products with unbeatable quality and service. Your satisfaction is our priority.</p>
-    {% if not user %}
-        <a href="{{ url_for('register') }}" class="btn btn-success">Get Started</a>
-    {% endif %}
-</div>
+<section class="hero-layout">
+    <div class="card hero-copy">
+        <span class="eyebrow">Powerful e-commerce upgrade</span>
+        <h1>Sell with stronger discovery, trust, and checkout confidence.</h1>
+        <p class="lead">
+            {{ site_name }} now highlights product availability, smarter discovery filters,
+            cleaner browsing, and a storefront flow that feels closer to a serious commercial website.
+        </p>
 
-<section>
-    <h2 style="text-align: center; margin-bottom: 2rem; font-size: 2.5rem; color: var(--text);">Featured Products</h2>
-    
-    {% if products %}
-        <div class="grid">
-            {% for product in products %}
-                <div class="card" style="transition: all 0.3s ease; cursor: pointer;" onclick="window.location.href='{{ url_for('product_detail', product_id=product[0]) }}'">
-                    {% if product[4] %}
-                        <img src="{{ product[4] }}" alt="{{ product[1] }}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;">
+        <div class="hero-actions">
+            <a href="#catalog" class="btn">Explore Catalog</a>
+            {% if not user %}
+                <a href="{{ url_for('register') }}" class="btn btn-secondary">Create Customer Account</a>
+            {% else %}
+                <a href="{{ url_for('cart') }}" class="btn btn-secondary">Open Cart</a>
+            {% endif %}
+        </div>
+
+        <div class="metric-grid">
+            <div class="metric-card">
+                <span class="metric-label">Products</span>
+                <span class="metric-value">{{ store_stats.total_products }}</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Ready To Ship</span>
+                <span class="metric-value">{{ store_stats.available_products }}</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Categories</span>
+                <span class="metric-value">{{ store_stats.category_count }}</span>
+            </div>
+        </div>
+    </div>
+
+    <aside class="hero-note">
+        <div class="hero-note-item">
+            <strong>Search and filter faster</strong>
+            <span>Shoppers can now discover products by name, category, price range, and sort order.</span>
+        </div>
+        <div class="hero-note-item">
+            <strong>Stock-aware shopping</strong>
+            <span>Low-stock and out-of-stock states are visible before customers reach checkout.</span>
+        </div>
+        <div class="hero-note-item">
+            <strong>Built for conversion</strong>
+            <span>Direct product links, quick add-to-cart, and cleaner product cards reduce friction.</span>
+        </div>
+    </aside>
+</section>
+
+<section class="card filter-card" id="catalog">
+    <div class="card-header">
+        <span class="eyebrow">Product Discovery</span>
+        <h2>Search, filter, and sort your catalog</h2>
+        <p class="lead">Give customers the fastest path from browsing to buying.</p>
+    </div>
+
+    <form method="GET" action="{{ url_for('home') }}#catalog">
+        <div class="field-grid">
+            <div class="form-group">
+                <label for="search">Search products</label>
+                <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Name or description">
+            </div>
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                    <option value="">All categories</option>
+                    {% for category in categories %}
+                        <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="field-grid">
+            <div class="form-group">
+                <label for="min_price">Minimum price</label>
+                <input type="number" id="min_price" name="min_price" min="0" step="0.01" value="{{ min_price }}" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label for="max_price">Maximum price</label>
+                <input type="number" id="max_price" name="max_price" min="0" step="0.01" value="{{ max_price }}" placeholder="2500">
+            </div>
+        </div>
+
+        <div class="field-grid">
+            <div class="form-group">
+                <label for="sort">Sort products</label>
+                <select id="sort" name="sort">
+                    <option value="newest" {% if sort_option == 'newest' %}selected{% endif %}>Newest first</option>
+                    <option value="price_low" {% if sort_option == 'price_low' %}selected{% endif %}>Price: low to high</option>
+                    <option value="price_high" {% if sort_option == 'price_high' %}selected{% endif %}>Price: high to low</option>
+                    <option value="name_az" {% if sort_option == 'name_az' %}selected{% endif %}>Name: A to Z</option>
+                    <option value="name_za" {% if sort_option == 'name_za' %}selected{% endif %}>Name: Z to A</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Filter status</label>
+                <div class="subtle-panel">
+                    {% if active_filters %}
+                        Filters active. Use clear to return to the full catalog.
                     {% else %}
-                        <div style="width: 100%; height: 200px; background: var(--gradient); border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem;">No Image</div>
+                        No filters applied. Customers are seeing your full storefront.
                     {% endif %}
-                    
-                    <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text);">{{ product[1] }}</h3>
-                    
-                    {% if product[2] %}
-                        <p style="color: var(--text-light); margin-bottom: 1rem;">{{ product[2][:100] }}{% if product[2]|length > 100 %}...{% endif %}</p>
-                    {% endif %}
-                    
-                    <div class="price">₹{{ "%.2f"|format(product[3]) }}</div>
-                    
-                    <a href="{{ url_for('product_detail', product_id=product[0]) }}" class="btn" style="width: 100%; margin-top: 1rem;">View Details</a>
                 </div>
+            </div>
+        </div>
+
+        <div class="filter-actions">
+            <button type="submit" class="btn">Apply Filters</button>
+            {% if active_filters %}
+                <a href="{{ url_for('home') }}#catalog" class="btn btn-secondary">Clear Filters</a>
+            {% endif %}
+        </div>
+    </form>
+</section>
+
+<section class="mt-3">
+    <div class="catalog-header">
+        <div>
+            <span class="eyebrow">Storefront Results</span>
+            <h2>Featured products for better conversion</h2>
+            <p>{{ result_count }} product{% if result_count != 1 %}s{% endif %} currently match your storefront settings.</p>
+        </div>
+    </div>
+
+    {% if products %}
+        <div class="product-grid">
+            {% for product in products %}
+                <article class="card product-card">
+                    <a class="product-media" href="{{ url_for('product_detail', product_id=product.id) }}">
+                        {% if product.image %}
+                            <img src="{{ product.image }}" alt="{{ product.name }}">
+                        {% else %}
+                            <div class="product-fallback">{{ product.name }}</div>
+                        {% endif %}
+                    </a>
+
+                    <div class="product-content">
+                        <div class="product-meta">
+                            <span class="pill pill-neutral">{{ product.category_name }}</span>
+                            <span class="pill pill-{{ product.stock_tone }}">{{ product.stock_label }}</span>
+                        </div>
+
+                        <div>
+                            <a class="product-title" href="{{ url_for('product_detail', product_id=product.id) }}">
+                                <h3>{{ product.name }}</h3>
+                            </a>
+                        </div>
+
+                        <p class="product-copy">
+                            {{ product.short_description if product.short_description else 'A curated product built for dependable quality and customer confidence.' }}
+                        </p>
+
+                        <div class="product-bottom">
+                            <span class="price">Rs.{{ "%.2f"|format(product.price) }}</span>
+                            <div class="inline-actions">
+                                <a href="{{ url_for('product_detail', product_id=product.id) }}" class="btn btn-secondary btn-sm">View Details</a>
+                                {% if user and product.in_stock %}
+                                    <form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}" class="quick-cart-form">
+                                        <input type="hidden" name="quantity" value="1">
+                                        <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                                        <button type="submit" class="btn btn-sm">Add to Cart</button>
+                                    </form>
+                                {% elif not product.in_stock %}
+                                    <span class="pill pill-danger">Unavailable</span>
+                                {% else %}
+                                    <a href="{{ url_for('login') }}" class="btn btn-sm">Login to Buy</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </article>
             {% endfor %}
         </div>
     {% else %}
-        <div class="card text-center">
-            <h3>No Products Available</h3>
-            <p style="color: var(--text-light);">Check back later for new products!</p>
-            {% if user and user.is_admin %}
-                <a href="{{ url_for('add_product') }}" class="btn mt-2">Add First Product</a>
-            {% endif %}
+        <div class="card empty-state">
+            <h2>No matching products found</h2>
+            <p>Try a broader search, remove one of the filters, or add more products from the admin area.</p>
+            <div class="inline-actions" style="justify-content: center;">
+                <a href="{{ url_for('home') }}#catalog" class="btn">Reset Catalog View</a>
+                {% if user and user.is_admin %}
+                    <a href="{{ url_for('add_product') }}" class="btn btn-secondary">Add Product</a>
+                {% endif %}
+            </div>
         </div>
     {% endif %}
 </section>
 
-<style>
-.hero {
-    animation: fadeIn 1s ease-out;
-}
-
-.card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-}
-
-@keyframes fadeIn {
-    from { 
-        opacity: 0; 
-        transform: translateY(30px); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0); 
-    }
-}
-</style>
+<section class="trust-grid">
+    <div class="subtle-panel">
+        <strong>Visible stock confidence</strong>
+        Shoppers know when inventory is ready, low, or unavailable before they commit.
+    </div>
+    <div class="subtle-panel">
+        <strong>Cleaner browsing flow</strong>
+        Product discovery is now closer to a real online store experience instead of a simple listing page.
+    </div>
+    <div class="subtle-panel">
+        <strong>Sales-focused layout</strong>
+        Product cards, category signals, and quick actions keep attention on purchase intent.
+    </div>
+</section>
 {% endblock %}

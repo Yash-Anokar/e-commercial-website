@@ -1,65 +1,247 @@
 {% extends "base.html" %}
 
-{% block title %}Shopping Cart - VAPU{% endblock %}
+{% block title %}Shopping Cart | {{ site_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .cart-layout {
+        display: grid;
+        grid-template-columns: 1.45fr 0.9fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    .cart-stack {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .cart-item {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .cart-media {
+        min-height: 150px;
+        border-radius: 18px;
+        overflow: hidden;
+        background:
+            linear-gradient(135deg, rgba(31, 106, 73, 0.1), rgba(197, 121, 44, 0.16)),
+            rgba(239, 229, 210, 0.72);
+        display: grid;
+        place-items: center;
+    }
+
+    .cart-media img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+    }
+
+    .cart-fallback {
+        padding: 1rem;
+        text-align: center;
+        color: var(--primary);
+        font-family: Cambria, Georgia, serif;
+    }
+
+    .cart-content {
+        display: grid;
+        gap: 0.85rem;
+    }
+
+    .cart-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: start;
+        flex-wrap: wrap;
+    }
+
+    .cart-item h3 a {
+        text-decoration: none;
+    }
+
+    .cart-item h3 a:hover {
+        color: var(--primary);
+    }
+
+    .qty-form {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: end;
+    }
+
+    .qty-form .form-group {
+        margin-bottom: 0;
+        min-width: 130px;
+    }
+
+    .cart-summary {
+        position: sticky;
+        top: 7rem;
+        display: grid;
+        gap: 1rem;
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        font-weight: 700;
+    }
+
+    .summary-row.total {
+        padding-top: 1rem;
+        border-top: 1px solid rgba(216, 203, 183, 0.8);
+        font-size: 1.1rem;
+    }
+
+    @media (max-width: 960px) {
+        .cart-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .cart-summary {
+            position: static;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .cart-item {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h2>Shopping Cart</h2>
+<div class="page-header">
+    <div>
+        <span class="eyebrow">Cart Control</span>
+        <h1>Review your order before checkout</h1>
+        <p class="lead">Quantities can now be updated with live stock protection.</p>
     </div>
+    <div class="inline-actions">
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Continue Shopping</a>
+    </div>
+</div>
 
-    {% if items %}
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                        <th>Subtotal</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in items %}
-                    <tr>
-                        <td>
-                            <a href="{{ url_for('product_detail', product_id=item[4]) }}" style="color: var(--primary); text-decoration: none; font-weight: 600;">
-                                {{ item[1] }}
-                            </a>
-                        </td>
-                        <td class="price" style="font-size: 1rem;">₹{{ "%.2f"|format(item[2]) }}</td>
-                        <td>{{ item[3] }}</td>
-                        <td class="price" style="font-size: 1rem;">₹{{ "%.2f"|format(item[2] * item[3]) }}</td>
-                        <td>
-                            <a href="{{ url_for('remove_from_cart', cart_id=item[0]) }}" class="btn btn-danger btn-sm" onclick="return confirm('Remove this item from cart?')">
+{% if items %}
+    <div class="cart-layout">
+        <section class="cart-stack">
+            {% for item in items %}
+                <article class="card cart-item">
+                    <a class="cart-media" href="{{ url_for('product_detail', product_id=item.id) }}">
+                        {% if item.image %}
+                            <img src="{{ item.image }}" alt="{{ item.name }}">
+                        {% else %}
+                            <div class="cart-fallback">{{ item.name }}</div>
+                        {% endif %}
+                    </a>
+
+                    <div class="cart-content">
+                        <div class="cart-header">
+                            <div>
+                                <div class="inline-actions">
+                                    <span class="pill pill-neutral">{{ item.category_name }}</span>
+                                    <span class="pill pill-{{ item.stock_tone }}">{{ item.stock_label }}</span>
+                                </div>
+                                <h3 class="mt-1">
+                                    <a href="{{ url_for('product_detail', product_id=item.id) }}">{{ item.name }}</a>
+                                </h3>
+                                <p class="lead">{{ item.short_description }}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="price">Rs.{{ "%.2f"|format(item.subtotal) }}</div>
+                                <small>Unit price: Rs.{{ "%.2f"|format(item.price) }}</small>
+                            </div>
+                        </div>
+
+                        {% if item.stock_message %}
+                            <div class="pill pill-{{ 'danger' if item.stock_issue else item.stock_tone }}">{{ item.stock_message }}</div>
+                        {% endif %}
+
+                        <form method="POST" action="{{ url_for('update_cart', cart_id=item.cart_id) }}" class="qty-form">
+                            <div class="form-group">
+                                <label for="quantity-{{ item.cart_id }}">Quantity</label>
+                                <input
+                                    type="number"
+                                    id="quantity-{{ item.cart_id }}"
+                                    name="quantity"
+                                    min="0"
+                                    {% if item.stock > 0 %}max="{{ item.stock }}"{% endif %}
+                                    value="{{ item.quantity }}"
+                                    required
+                                >
+                            </div>
+                            <button type="submit" class="btn btn-secondary btn-sm">Update Quantity</button>
+                            <a
+                                href="{{ url_for('remove_from_cart', cart_id=item.cart_id) }}"
+                                class="btn btn-danger btn-sm"
+                                onclick="return confirm('Remove this item from cart?')"
+                            >
                                 Remove
                             </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                        </form>
+                    </div>
+                </article>
+            {% endfor %}
+        </section>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding: 1.5rem; background: var(--secondary); border-radius: 12px;">
+        <aside class="card cart-summary">
             <div>
-                <h3 style="font-size: 1.5rem; color: var(--text);">Total: <span class="price" style="font-size: 1.8rem;">₹{{ "%.2f"|format(total) }}</span></h3>
+                <span class="eyebrow">Order Summary</span>
+                <h2>Ready for secure checkout</h2>
             </div>
-            <div style="display: flex; gap: 1rem;">
-                <a href="{{ url_for('home') }}" class="btn btn-secondary">Continue Shopping</a>
-                <a href="{{ url_for('checkout') }}" class="btn btn-success" style="font-size: 1.1rem; padding: 1rem 2rem;">
+
+            <div class="summary-row">
+                <span>Total items</span>
+                <span>{{ summary.item_count }}</span>
+            </div>
+            <div class="summary-row">
+                <span>Stock status</span>
+                <span>
+                    {% if summary.has_stock_issues %}
+                        Action needed
+                    {% else %}
+                        Ready
+                    {% endif %}
+                </span>
+            </div>
+            <div class="summary-row total">
+                <span>Subtotal</span>
+                <span>Rs.{{ "%.2f"|format(summary.total) }}</span>
+            </div>
+
+            {% if summary.has_stock_issues %}
+                <div class="subtle-panel">
+                    <strong>Checkout paused</strong>
+                    <p>Resolve the highlighted stock issues above before placing the order.</p>
+                </div>
+            {% else %}
+                <div class="subtle-panel">
+                    <strong>Checkout protection</strong>
+                    <p>Online and UPI payments still require OTP verification at the next step.</p>
+                </div>
+            {% endif %}
+
+            <div class="inline-actions" style="flex-direction: column;">
+                <a href="{{ url_for('checkout') }}" class="btn btn-success {% if summary.has_stock_issues %}disabled{% endif %}" {% if summary.has_stock_issues %}aria-disabled="true" onclick="return false;"{% endif %}>
                     Proceed to Checkout
                 </a>
+                <a href="{{ url_for('home') }}" class="btn btn-secondary">Add More Products</a>
             </div>
-        </div>
-    {% else %}
-        <div class="text-center" style="padding: 3rem;">
-            <div style="font-size: 4rem; margin-bottom: 1rem;">🛒</div>
-            <h3 style="margin-bottom: 1rem;">Your cart is empty</h3>
-            <p style="color: var(--text-light); margin-bottom: 2rem;">Start shopping to add items to your cart!</p>
-            <a href="{{ url_for('home') }}" class="btn">Start Shopping</a>
-        </div>
-    {% endif %}
-</div>
+        </aside>
+    </div>
+{% else %}
+    <div class="card empty-state">
+        <h2>Your cart is empty</h2>
+        <p>Add products from the storefront to start building an order.</p>
+        <a href="{{ url_for('home') }}" class="btn">Start Shopping</a>
+    </div>
+{% endif %}
 {% endblock %}

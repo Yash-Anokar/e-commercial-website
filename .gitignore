@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+app-run.log
+app-run.err.log
+ecommerce_env/

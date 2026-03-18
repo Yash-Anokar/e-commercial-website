@@ -1,12 +1,42 @@
 {% extends "base.html" %}
 
-{% block title %}Checkout - VAPU{% endblock %}
+{% block title %}Order Confirmed | {{ site_name }}{% endblock %}
 
 {% block content %}
-<h1>Order Confirmed!</h1>
+<div class="card" style="max-width: 760px; margin: 0 auto; text-align: center;">
+    <span class="eyebrow">Order Confirmed</span>
+    <h1 class="mb-2">Your order has been placed successfully.</h1>
+    <p class="lead mb-3">
+        The storefront has recorded your order, reduced stock automatically, and generated a tracking number for follow-up.
+    </p>
 
-<p>Thank you for your order. Your items have been processed successfully.</p>
+    {% if order %}
+        <div class="metric-grid mb-3">
+            <div class="metric-card">
+                <span class="metric-label">Order ID</span>
+                <span class="metric-value">#{{ order.id }}</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Tracking Number</span>
+                <span class="metric-value" style="font-size: 1.2rem;">{{ order.tracking_number }}</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Order Total</span>
+                <span class="metric-value">Rs.{{ "%.2f"|format(order.total_amount) }}</span>
+            </div>
+        </div>
 
-<p><a href="{{ url_for('orders') }}">View Orders</a></p>
-<p><a href="{{ url_for('home') }}">Continue Shopping</a></p>
+        <div class="subtle-panel mb-3" style="text-align: left;">
+            <strong>Customer</strong>
+            <p>{{ order.customer_name }}</p>
+            <strong>Payment method</strong>
+            <p>{{ order.payment_method }}</p>
+        </div>
+    {% endif %}
+
+    <div class="inline-actions" style="justify-content: center;">
+        <a href="{{ url_for('orders') }}" class="btn">View Orders</a>
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Continue Shopping</a>
+    </div>
+</div>
 {% endblock %}
