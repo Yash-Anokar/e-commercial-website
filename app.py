@@ -7,6 +7,7 @@ import random
 import string
 from datetime import datetime, timedelta
 from contextlib import contextmanager
+<<<<<<< HEAD
 from dotenv import load_dotenv
 
 # Load environment variables from .env file (for local development)
@@ -14,12 +15,39 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'vasundhara-agro-secret-key-2024')
+=======
+from functools import wraps
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv():
+        env_path = os.path.join(os.getcwd(), '.env')
+        if not os.path.exists(env_path):
+            return False
+
+        with open(env_path, 'r', encoding='utf-8') as env_file:
+            for line in env_file:
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#') or '=' not in stripped:
+                    continue
+                key, value = stripped.split('=', 1)
+                os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        return True
+
+# Load environment variables from .env file
+load_dotenv()
+
+app = Flask(__name__)
+# Use environment variable for secret key, fallback only for local development
+app.secret_key = os.getenv('SECRET_KEY', 'dev-only-secret-key-change-me')
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
 
 # Site Configuration
 SITE_NAME = "Vasundhara Agro Processing Center"
 SITE_LOCATION = "Anjangaon Surji"
 SITE_TAGLINE = "Pure Ayurvedic Products from Nature"
 
+<<<<<<< HEAD
 # ============= DATABASE CONFIGURATION =============
 # Read environment variables
 MYSQLHOST     = os.getenv('MYSQLHOST')
@@ -53,6 +81,17 @@ DB_CONFIG = {
     'charset'   : 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor,
     'connect_timeout': 10
+=======
+# MySQL Database configuration - Use environment variables for production
+DB_CONFIG = {
+    'host': os.getenv('DB_HOST') or os.getenv('MYSQLHOST', 'localhost'),
+    'user': os.getenv('DB_USER') or os.getenv('MYSQLUSER', 'root'),
+    'password': os.getenv('DB_PASSWORD') or os.getenv('MYSQLPASSWORD', ''),
+    'database': os.getenv('DB_NAME') or os.getenv('MYSQLDATABASE', 'vasundhara_agro_db'),
+    'port': int(os.getenv('DB_PORT') or os.getenv('MYSQLPORT', 3306)),
+    'charset': 'utf8mb4',
+    'cursorclass': pymysql.cursors.DictCursor
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
 }
 
 # OTP storage (in-memory)
@@ -73,6 +112,19 @@ def get_db_connection():
     finally:
         if conn:
             conn.close()
+
+def ensure_column_exists(cursor, table_name, column_name, definition):
+    """Add columns when upgrading older database schemas."""
+    cursor.execute(
+        '''
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s
+        ''',
+        (DB_CONFIG['database'], table_name, column_name)
+    )
+    if not cursor.fetchone():
+        cursor.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}')
 
 def init_db():
     """Initialize the database with required tables"""
@@ -119,7 +171,13 @@ def init_db():
                 stock INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''')
+<<<<<<< HEAD
 
+=======
+            ensure_column_exists(cursor, 'products', 'category_name', 'VARCHAR(100) NULL AFTER stock')
+            ensure_column_exists(cursor, 'products', 'is_active', 'TINYINT(1) DEFAULT 1 AFTER category_name')
+            
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
             # Cart table
             cursor.execute('''CREATE TABLE IF NOT EXISTS cart (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -220,36 +278,269 @@ def send_otp_sms(phone, message):
     print(f"{'='*60}\n")
     return True
 
+def normalize_category_name(category_name):
+    """Normalize product category text for consistent filtering."""
+    cleaned = ' '.join((category_name or '').split())
+    return cleaned.title() if cleaned else None
+
+def parse_price_filter(raw_value):
+    """Parse price filters without failing on bad query strings."""
+    if raw_value in (None, ''):
+        return None
+    try:
+        value = float(raw_value)
+        return value if value >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+def build_product_view(product):
+    """Convert a DB row into a richer template-friendly product object."""
+    description = (product.get('description') or '').strip()
+    stock = max(int(product.get('stock') or 0), 0)
+    price = float(product.get('price') or 0)
+    category_name = normalize_category_name(product.get('category_name')) or 'General Collection'
+
+    if stock <= 0:
+        stock_label = 'Out of stock'
+        stock_tone = 'danger'
+    elif stock <= 5:
+        stock_label = f'Only {stock} left'
+        stock_tone = 'warning'
+    else:
+        stock_label = 'Ready to ship'
+        stock_tone = 'success'
+
+    short_description = description
+    if len(short_description) > 120:
+        short_description = short_description[:117].rstrip() + '...'
+
+    return {
+        'id': product.get('id') or product.get('product_id'),
+        'name': product['name'],
+        'description': description,
+        'short_description': short_description,
+        'price': price,
+        'image': product.get('image'),
+        'stock': stock,
+        'category_name': category_name,
+        'is_active': bool(product.get('is_active', 1)),
+        'created_at': product.get('created_at'),
+        'in_stock': stock > 0,
+        'low_stock': 0 < stock <= 5,
+        'stock_label': stock_label,
+        'stock_tone': stock_tone,
+    }
+
+def build_cart_item_view(item):
+    """Decorate cart rows with pricing and stock validation metadata."""
+    product = build_product_view(item)
+    quantity = int(item.get('quantity') or 0)
+    subtotal = product['price'] * quantity
+    stock_message = ''
+    stock_issue = False
+
+    if product['stock'] <= 0:
+        stock_issue = True
+        stock_message = 'This product is currently unavailable.'
+    elif quantity > product['stock']:
+        stock_issue = True
+        stock_message = f'Only {product["stock"]} available right now. Please reduce quantity.'
+    elif product['low_stock']:
+        stock_message = f'Fast moving item. Only {product["stock"]} left in stock.'
+
+    return {
+        **product,
+        'cart_id': item.get('id'),
+        'quantity': quantity,
+        'subtotal': subtotal,
+        'stock_issue': stock_issue,
+        'stock_message': stock_message,
+    }
+
+def fetch_distinct_categories(cursor):
+    """List available categories for storefront filters."""
+    cursor.execute(
+        '''
+        SELECT DISTINCT category_name
+        FROM products
+        WHERE is_active = 1
+          AND category_name IS NOT NULL
+          AND TRIM(category_name) <> ''
+        ORDER BY category_name ASC
+        '''
+    )
+    return [row['category_name'] for row in cursor.fetchall()]
+
+def fetch_cart_items(cursor, user_id):
+    """Load cart items together with their products."""
+    cursor.execute(
+        '''
+        SELECT
+            c.id,
+            c.quantity,
+            p.id AS product_id,
+            p.name,
+            p.description,
+            p.price,
+            p.image,
+            p.stock,
+            p.category_name,
+            p.created_at
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        WHERE c.user_id = %s
+        ORDER BY c.created_at DESC
+        ''',
+        (user_id,)
+    )
+    raw_items = cursor.fetchall()
+    items = [build_cart_item_view(item) for item in raw_items]
+    summary = {
+        'total': sum(item['subtotal'] for item in items),
+        'item_count': sum(item['quantity'] for item in items),
+        'has_stock_issues': any(item['stock_issue'] for item in items),
+    }
+    return items, summary
+
+def get_cart_count_for_user(user_id):
+    """Return the total quantity of items in a user's cart."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT COALESCE(SUM(quantity), 0) AS total_items FROM cart WHERE user_id = %s',
+                (user_id,)
+            )
+            result = cursor.fetchone()
+            cursor.close()
+        return int((result or {}).get('total_items') or 0)
+    except Error:
+        return 0
+
+def get_safe_redirect(default_endpoint='cart'):
+    """Allow only local next paths from forms."""
+    next_path = request.form.get('next', '').strip()
+    if next_path.startswith('/'):
+        return next_path
+    return url_for(default_endpoint)
+
+@app.context_processor
+def inject_site_context():
+    """Provide shared branding and cart data to templates."""
+    user = get_user()
+    cart_count = get_cart_count_for_user(user['id']) if user else 0
+    return {
+        'site_name': SITE_NAME,
+        'site_location': SITE_LOCATION,
+        'site_tagline': SITE_TAGLINE,
+        'current_user': user,
+        'cart_count': cart_count,
+        'current_year': datetime.now().year,
+    }
+
 def login_required(f):
+<<<<<<< HEAD
+=======
+    """Decorator for routes that require login"""
+    @wraps(f)
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
     def decorated_function(*args, **kwargs):
         if not get_user():
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
     return decorated_function
 
 def admin_required(f):
+<<<<<<< HEAD
+=======
+    """Decorator for routes that require admin access"""
+    @wraps(f)
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
     def decorated_function(*args, **kwargs):
         user = get_user()
         if not user or not user.get('is_admin'):
             flash('Admin access required.', 'danger')
             return redirect(url_for('home'))
         return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
     return decorated_function
 
 # ============= PUBLIC ROUTES =============
 
 @app.route('/')
 def home():
+<<<<<<< HEAD
+=======
+    """Home page with product listing, filters, and sorting."""
+    search_query = request.args.get('search', '').strip()
+    selected_category = normalize_category_name(request.args.get('category', ''))
+    sort_option = request.args.get('sort', 'newest')
+    min_price = parse_price_filter(request.args.get('min_price'))
+    max_price = parse_price_filter(request.args.get('max_price'))
+    sort_map = {
+        'newest': 'created_at DESC',
+        'price_low': 'price ASC, created_at DESC',
+        'price_high': 'price DESC, created_at DESC',
+        'name_az': 'name ASC',
+        'name_za': 'name DESC',
+    }
+
+    if sort_option not in sort_map:
+        sort_option = 'newest'
+    if min_price is not None and max_price is not None and min_price > max_price:
+        min_price, max_price = max_price, min_price
+
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM products ORDER BY created_at DESC')
-            products = cursor.fetchall()
+
+            filters = ['is_active = 1']
+            params = []
+            if search_query:
+                like_value = f'%{search_query}%'
+                filters.append('(name LIKE %s OR description LIKE %s)')
+                params.extend([like_value, like_value])
+            if selected_category:
+                filters.append('category_name = %s')
+                params.append(selected_category)
+            if min_price is not None:
+                filters.append('price >= %s')
+                params.append(min_price)
+            if max_price is not None:
+                filters.append('price <= %s')
+                params.append(max_price)
+
+            where_clause = f"WHERE {' AND '.join(filters)}" if filters else ''
+            cursor.execute(
+                f'''
+                SELECT id, name, description, price, image, stock, category_name, created_at
+                FROM products
+                {where_clause}
+                ORDER BY {sort_map[sort_option]}
+                ''',
+                params
+            )
+            products = [build_product_view(product) for product in cursor.fetchall()]
+
+            categories = fetch_distinct_categories(cursor)
+            cursor.execute(
+                '''
+                SELECT
+                    COUNT(*) AS total_products,
+                    COALESCE(SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END), 0) AS available_products,
+                    COALESCE(COUNT(DISTINCT CASE
+                        WHEN category_name IS NULL OR TRIM(category_name) = '' THEN NULL
+                        ELSE category_name
+                    END), 0) AS category_count
+                FROM products
+                WHERE is_active = 1
+                '''
+            )
+            store_stats = cursor.fetchone() or {}
             cursor.close()
 
+<<<<<<< HEAD
         products_list = [(p['id'], p['name'], p['description'], float(p['price']), p['image']) for p in products]
 
         return render_template('home.html',
@@ -266,6 +557,42 @@ def home():
                                site_name=SITE_NAME,
                                site_location=SITE_LOCATION,
                                site_tagline=SITE_TAGLINE)
+=======
+        return render_template(
+            'home.html',
+            products=products,
+            categories=categories,
+            search_query=search_query,
+            selected_category=selected_category or '',
+            min_price='' if min_price is None else min_price,
+            max_price='' if max_price is None else max_price,
+            sort_option=sort_option,
+            result_count=len(products),
+            active_filters=bool(search_query or selected_category or min_price is not None or max_price is not None),
+            store_stats={
+                'total_products': int(store_stats.get('total_products') or 0),
+                'available_products': int(store_stats.get('available_products') or 0),
+                'category_count': int(store_stats.get('category_count') or 0),
+            },
+            user=get_user(),
+        )
+    except Error as e:
+        flash('Error loading products.', 'danger')
+        return render_template(
+            'home.html',
+            products=[],
+            categories=[],
+            search_query=search_query,
+            selected_category=selected_category or '',
+            min_price='' if min_price is None else min_price,
+            max_price='' if max_price is None else max_price,
+            sort_option=sort_option,
+            result_count=0,
+            active_filters=bool(search_query or selected_category or min_price is not None or max_price is not None),
+            store_stats={'total_products': 0, 'available_products': 0, 'category_count': 0},
+            user=get_user(),
+        )
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -349,10 +676,66 @@ def product_detail(product_id):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
+            cursor.execute(
+                '''
+                SELECT id, name, description, price, image, stock, category_name, is_active, created_at
+                FROM products
+                WHERE id = %s AND is_active = 1
+                ''',
+                (product_id,)
+            )
             product = cursor.fetchone()
+
+            if not product:
+                cursor.close()
+                flash('Product not found.', 'danger')
+                return redirect(url_for('home'))
+
+            product_view = build_product_view(product)
+            min_related_price = max(product_view['price'] - 300, 0)
+            max_related_price = product_view['price'] + 300
+
+            cursor.execute(
+                '''
+                SELECT id, name, description, price, image, stock, category_name, is_active, created_at
+                FROM products
+                WHERE is_active = 1
+                  AND id <> %s
+                  AND (
+                        category_name = %s
+                        OR price BETWEEN %s AND %s
+                      )
+                ORDER BY
+                    CASE WHEN category_name = %s THEN 0 ELSE 1 END,
+                    created_at DESC
+                LIMIT 4
+                ''',
+                (
+                    product_id,
+                    product.get('category_name'),
+                    min_related_price,
+                    max_related_price,
+                    product.get('category_name'),
+                )
+            )
+            related_products = [build_product_view(item) for item in cursor.fetchall()]
+
+            if not related_products:
+                cursor.execute(
+                    '''
+                    SELECT id, name, description, price, image, stock, category_name, is_active, created_at
+                    FROM products
+                    WHERE is_active = 1 AND id <> %s
+                    ORDER BY created_at DESC
+                    LIMIT 4
+                    ''',
+                    (product_id,)
+                )
+                related_products = [build_product_view(item) for item in cursor.fetchall()]
+
             cursor.close()
 
+<<<<<<< HEAD
         if not product:
             flash('Product not found.', 'danger')
             return redirect(url_for('home'))
@@ -360,6 +743,15 @@ def product_detail(product_id):
         product_tuple = (product['id'], product['name'], product['description'], float(product['price']), product['image'])
         return render_template('product_detail.html', product=product_tuple, user=get_user())
     except Error:
+=======
+        return render_template(
+            'product_detail.html',
+            product=product_view,
+            related_products=related_products,
+            user=get_user(),
+        )
+    except Error as e:
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
         flash('Error loading product.', 'danger')
         return redirect(url_for('home'))
 
@@ -368,6 +760,7 @@ def product_detail(product_id):
 @app.route('/add_to_cart/<int:product_id>', methods=['POST'])
 @login_required
 def add_to_cart(product_id):
+<<<<<<< HEAD
     try:
         quantity = int(request.form.get('quantity', 1))
         if quantity <= 0:
@@ -376,11 +769,31 @@ def add_to_cart(product_id):
         flash('Invalid quantity.', 'danger')
         return redirect(url_for('product_detail', product_id=product_id))
 
+=======
+    """Add product to cart"""
+    redirect_target = get_safe_redirect()
+
+    try:
+        quantity = int(request.form.get('quantity', 1))
+        if quantity <= 0:
+            flash('Invalid quantity.', 'danger')
+            return redirect(redirect_target)
+    except ValueError:
+        flash('Invalid quantity.', 'danger')
+        return redirect(redirect_target)
+    
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
     user = get_user()
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+<<<<<<< HEAD
             cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
+=======
+            
+            # Check if product exists
+            cursor.execute('SELECT * FROM products WHERE id = %s AND is_active = 1', (product_id,))
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
             product = cursor.fetchone()
 
             if not product:
@@ -388,10 +801,41 @@ def add_to_cart(product_id):
                 cursor.close()
                 return redirect(url_for('home'))
 
+<<<<<<< HEAD
             cursor.execute('SELECT * FROM cart WHERE user_id = %s AND product_id = %s', (user['id'], product_id))
             existing = cursor.fetchone()
 
             if existing:
+=======
+            available_stock = max(int(product.get('stock') or 0), 0)
+            if available_stock <= 0:
+                flash(f'{product["name"]} is currently out of stock.', 'warning')
+                cursor.close()
+                return redirect(redirect_target)
+            if quantity > available_stock:
+                flash(f'Only {available_stock} unit(s) of {product["name"]} are available.', 'warning')
+                cursor.close()
+                return redirect(redirect_target)
+            
+            # Check if item is already in cart
+            cursor.execute(
+                'SELECT * FROM cart WHERE user_id = %s AND product_id = %s', 
+                (user['id'], product_id)
+            )
+            existing_item = cursor.fetchone()
+            
+            if existing_item:
+                # Update quantity
+                new_quantity = existing_item['quantity'] + quantity
+                if new_quantity > available_stock:
+                    flash(
+                        f'You already have {existing_item["quantity"]} in cart. '
+                        f'Only {available_stock} unit(s) are available.',
+                        'warning'
+                    )
+                    cursor.close()
+                    return redirect(redirect_target)
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
                 cursor.execute(
                     'UPDATE cart SET quantity = %s WHERE user_id = %s AND product_id = %s',
                     (existing['quantity'] + quantity, user['id'], product_id)
@@ -407,8 +851,13 @@ def add_to_cart(product_id):
             flash(f'Added {quantity} x {product["name"]} to cart!', 'success')
     except Error:
         flash('Error adding to cart.', 'danger')
+<<<<<<< HEAD
 
     return redirect(url_for('cart'))
+=======
+    
+    return redirect(redirect_target)
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
 
 @app.route('/cart')
 @login_required
@@ -417,16 +866,10 @@ def cart():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT c.id, c.quantity, p.id as product_id, p.name, p.price, p.image
-                FROM cart c
-                JOIN products p ON c.product_id = p.id
-                WHERE c.user_id = %s
-                ORDER BY c.created_at DESC
-            ''', (user['id'],))
-            cart_items = cursor.fetchall()
+            cart_items, summary = fetch_cart_items(cursor, user['id'])
             cursor.close()
 
+<<<<<<< HEAD
         items = []
         total = 0
         for item in cart_items:
@@ -435,8 +878,78 @@ def cart():
 
         return render_template('cart.html', items=items, total=total, user=user)
     except Error:
+=======
+        return render_template('cart.html', items=cart_items, summary=summary, user=user)
+    except Error as e:
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
         flash('Error loading cart.', 'danger')
-        return render_template('cart.html', items=[], total=0, user=user)
+        return render_template(
+            'cart.html',
+            items=[],
+            summary={'total': 0, 'item_count': 0, 'has_stock_issues': False},
+            user=user,
+        )
+
+@app.route('/cart/update/<int:cart_id>', methods=['POST'])
+@login_required
+def update_cart(cart_id):
+    """Update cart quantity with stock validation."""
+    user = get_user()
+
+    try:
+        quantity = int(request.form.get('quantity', 1))
+    except ValueError:
+        flash('Please enter a valid quantity.', 'danger')
+        return redirect(url_for('cart'))
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                '''
+                SELECT c.id, c.quantity, p.name, p.stock
+                FROM cart c
+                JOIN products p ON c.product_id = p.id
+                WHERE c.id = %s AND c.user_id = %s
+                ''',
+                (cart_id, user['id'])
+            )
+            cart_item = cursor.fetchone()
+
+            if not cart_item:
+                flash('Cart item not found.', 'danger')
+                cursor.close()
+                return redirect(url_for('cart'))
+
+            available_stock = max(int(cart_item.get('stock') or 0), 0)
+            if quantity <= 0:
+                cursor.execute('DELETE FROM cart WHERE id = %s AND user_id = %s', (cart_id, user['id']))
+                conn.commit()
+                cursor.close()
+                flash('Item removed from cart.', 'info')
+                return redirect(url_for('cart'))
+
+            if available_stock <= 0:
+                flash(f'{cart_item["name"]} is out of stock. Remove it to continue.', 'warning')
+                cursor.close()
+                return redirect(url_for('cart'))
+
+            if quantity > available_stock:
+                flash(f'Only {available_stock} unit(s) of {cart_item["name"]} are available.', 'warning')
+                cursor.close()
+                return redirect(url_for('cart'))
+
+            cursor.execute(
+                'UPDATE cart SET quantity = %s WHERE id = %s AND user_id = %s',
+                (quantity, cart_id, user['id'])
+            )
+            conn.commit()
+            cursor.close()
+            flash(f'Updated {cart_item["name"]} quantity.', 'success')
+    except Error:
+        flash('Unable to update your cart right now.', 'danger')
+
+    return redirect(url_for('cart'))
 
 @app.route('/remove_from_cart/<int:cart_id>')
 @login_required
@@ -467,6 +980,7 @@ def checkout():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+<<<<<<< HEAD
             cursor.execute('''
                 SELECT c.quantity, p.id as product_id, p.name, p.price
                 FROM cart c
@@ -483,6 +997,26 @@ def checkout():
         total = sum(float(item['price']) * item['quantity'] for item in cart_items)
         return render_template('checkout_with_otp.html', cart_items=cart_items, total=total, user=user)
     except Error:
+=======
+            cart_items, summary = fetch_cart_items(cursor, user['id'])
+            cursor.close()
+
+            if not cart_items:
+                flash('Your cart is empty.', 'warning')
+                return redirect(url_for('cart'))
+
+            if summary['has_stock_issues']:
+                flash('Please fix cart stock issues before checkout.', 'warning')
+                return redirect(url_for('cart'))
+
+            return render_template(
+                'checkout_with_otp.html',
+                cart_items=cart_items,
+                summary=summary,
+                user=user,
+            )
+    except Error as e:
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
         flash('Error loading checkout.', 'danger')
         return redirect(url_for('cart'))
 
@@ -549,7 +1083,7 @@ def process_checkout():
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT c.quantity, p.id as product_id, p.name, p.price
+                SELECT c.quantity, p.id as product_id, p.name, p.price, p.stock
                 FROM cart c
                 JOIN products p ON c.product_id = p.id
                 WHERE c.user_id = %s
@@ -560,10 +1094,33 @@ def process_checkout():
                 flash('Your cart is empty.', 'warning')
                 cursor.close()
                 return redirect(url_for('cart'))
+<<<<<<< HEAD
 
             total_amount     = sum(float(item['price']) * item['quantity'] for item in cart_items)
             tracking_number  = 'VAPC' + ''.join(random.choices(string.digits, k=8))
 
+=======
+            
+            unavailable_items = [
+                item['name']
+                for item in cart_items
+                if int(item.get('stock') or 0) < int(item.get('quantity') or 0)
+            ]
+            if unavailable_items:
+                cursor.close()
+                flash(
+                    'Some items changed while you were shopping. Please review your cart before checkout.',
+                    'warning'
+                )
+                return redirect(url_for('cart'))
+
+            total_amount = sum(float(item['price']) * item['quantity'] for item in cart_items)
+            
+            # Generate tracking number
+            tracking_number = 'VAPC' + ''.join(random.choices(string.digits, k=8))
+            
+            # Create order with delivery details
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
             cursor.execute('''
                 INSERT INTO orders
                 (user_id, customer_name, customer_phone, delivery_address,
@@ -582,6 +1139,28 @@ def process_checkout():
                     VALUES (%s, %s, %s, %s)
                 ''', (order_id, item['product_id'], item['quantity'], float(item['price'])))
 
+<<<<<<< HEAD
+=======
+                cursor.execute(
+                    '''
+                    UPDATE products
+                    SET stock = stock - %s
+                    WHERE id = %s AND stock >= %s
+                    ''',
+                    (item['quantity'], item['product_id'], item['quantity'])
+                )
+
+                if cursor.rowcount != 1:
+                    conn.rollback()
+                    cursor.close()
+                    flash(
+                        f'{item["name"]} is no longer available in the requested quantity. Please review your cart.',
+                        'warning'
+                    )
+                    return redirect(url_for('cart'))
+            
+            # Log status history
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
             cursor.execute('''
                 INSERT INTO order_status_history (order_id, status, notes, updated_by)
                 VALUES (%s, %s, %s, %s)
@@ -590,6 +1169,7 @@ def process_checkout():
             cursor.execute('DELETE FROM cart WHERE user_id = %s', (user['id'],))
             conn.commit()
             cursor.close()
+<<<<<<< HEAD
 
         if customer_phone in otp_storage:
             del otp_storage[customer_phone]
@@ -598,6 +1178,30 @@ def process_checkout():
         flash(f'Order placed successfully! Tracking: {tracking_number}', 'success')
         return render_template('checkout.html', user=user)
 
+=======
+            
+            # Clear OTP after successful order
+            if customer_phone in otp_storage:
+                del otp_storage[customer_phone]
+            
+            # Send confirmation SMS
+            send_otp_sms(customer_phone, 
+                        f"Order confirmed! Tracking: {tracking_number}. Total: ₹{total_amount:.2f}")
+            
+            flash(f'Order placed successfully! Tracking: {tracking_number}', 'success')
+            return render_template(
+                'checkout.html',
+                user=user,
+                order={
+                    'id': order_id,
+                    'tracking_number': tracking_number,
+                    'total_amount': total_amount,
+                    'payment_method': payment_method,
+                    'customer_name': customer_name,
+                },
+            )
+            
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
     except Error as e:
         print(f"Checkout error: {e}")
         flash('Error processing order. Please try again.', 'danger')
@@ -608,13 +1212,27 @@ def process_checkout():
 @app.route('/orders')
 @login_required
 def orders():
+<<<<<<< HEAD
+=======
+    """User order dashboard with history and quick stats."""
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
     user = get_user()
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT o.id, o.total_amount, o.status, o.created_at, o.tracking_number,
-                       GROUP_CONCAT(CONCAT(p.name, ' (x', oi.quantity, ')') SEPARATOR ', ') as items
+                SELECT
+                    o.id,
+                    o.total_amount,
+                    o.status,
+                    o.created_at,
+                    o.tracking_number,
+                    o.payment_method,
+                    o.delivery_city,
+                    o.delivery_pincode,
+                    o.customer_name,
+                    COALESCE(SUM(oi.quantity), 0) AS total_items,
+                    GROUP_CONCAT(CONCAT(p.name, ' (x', oi.quantity, ')') SEPARATOR ', ') AS items
                 FROM orders o
                 LEFT JOIN order_items oi ON o.id = oi.order_id
                 LEFT JOIN products p ON oi.product_id = p.id
@@ -623,16 +1241,71 @@ def orders():
                 ORDER BY o.created_at DESC
             ''', (user['id'],))
             user_orders = cursor.fetchall()
+
+            cursor.execute(
+                '''
+                SELECT
+                    COUNT(*) AS total_orders,
+                    COALESCE(SUM(total_amount), 0) AS total_spent,
+                    COALESCE(SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END), 0) AS delivered_orders,
+                    COALESCE(SUM(CASE
+                        WHEN status IN ('pending', 'confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery')
+                        THEN 1 ELSE 0
+                    END), 0) AS active_orders
+                FROM orders
+                WHERE user_id = %s
+                ''',
+                (user['id'],)
+            )
+            order_stats = cursor.fetchone() or {}
             cursor.close()
 
+<<<<<<< HEAD
         orders_list = [
             (o['id'], o['items'] or 'No items', 1, float(o['total_amount']))
             for o in user_orders
         ]
         return render_template('orders.html', orders=orders_list, user=user)
     except Error:
+=======
+        orders_list = []
+        for order in user_orders:
+            orders_list.append(
+                {
+                    'id': order['id'],
+                    'items': order['items'] or 'No items',
+                    'total_amount': float(order['total_amount']),
+                    'status': order['status'],
+                    'created_at': order['created_at'],
+                    'tracking_number': order['tracking_number'],
+                    'payment_method': order.get('payment_method') or 'COD',
+                    'delivery_city': order.get('delivery_city') or 'Unknown city',
+                    'delivery_pincode': order.get('delivery_pincode') or '-',
+                    'customer_name': order.get('customer_name') or user['username'],
+                    'total_items': int(order.get('total_items') or 0),
+                }
+            )
+
+        return render_template(
+            'orders.html',
+            orders=orders_list,
+            order_stats={
+                'total_orders': int(order_stats.get('total_orders') or 0),
+                'total_spent': float(order_stats.get('total_spent') or 0),
+                'delivered_orders': int(order_stats.get('delivered_orders') or 0),
+                'active_orders': int(order_stats.get('active_orders') or 0),
+            },
+            user=user,
+        )
+    except Error as e:
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
         flash('Error loading orders.', 'danger')
-        return render_template('orders.html', orders=[], user=user)
+        return render_template(
+            'orders.html',
+            orders=[],
+            order_stats={'total_orders': 0, 'total_spent': 0, 'delivered_orders': 0, 'active_orders': 0},
+            user=user,
+        )
 
 @app.route('/track_order/<tracking_number>')
 @login_required
@@ -670,10 +1343,18 @@ def add_product():
     if request.method == 'POST':
         name        = request.form['name'].strip()
         description = request.form['description'].strip()
+<<<<<<< HEAD
         price       = request.form['price']
         image       = request.form['image'].strip()
         stock       = request.form.get('stock', 0)
 
+=======
+        price = request.form['price']
+        image = request.form.get('image', '').strip() or None
+        stock = request.form.get('stock', 0)
+        category_name = normalize_category_name(request.form.get('category_name', ''))
+        
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
         if not name or not price:
             flash('Name and price are required.', 'danger')
             return render_template('add_product.html', user=get_user())
@@ -684,6 +1365,9 @@ def add_product():
             if price < 0:
                 flash('Price cannot be negative.', 'danger')
                 return render_template('add_product.html', user=get_user())
+            if stock < 0:
+                flash('Stock cannot be negative.', 'danger')
+                return render_template('add_product.html', user=get_user())
         except ValueError:
             flash('Invalid price or stock value.', 'danger')
             return render_template('add_product.html', user=get_user())
@@ -692,8 +1376,11 @@ def add_product():
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    'INSERT INTO products (name, description, price, image, stock) VALUES (%s, %s, %s, %s, %s)',
-                    (name, description, price, image, stock)
+                    '''
+                    INSERT INTO products (name, description, price, image, stock, category_name, is_active)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ''',
+                    (name, description, price, image, stock, category_name, 1)
                 )
                 conn.commit()
                 cursor.close()
@@ -710,13 +1397,40 @@ def manage_products():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM products ORDER BY created_at DESC')
-            products = cursor.fetchall()
+            cursor.execute(
+                '''
+                SELECT id, name, description, price, image, stock, category_name, is_active, created_at
+                FROM products
+                WHERE is_active = 1
+                ORDER BY created_at DESC
+                '''
+            )
+            products = [build_product_view(product) for product in cursor.fetchall()]
             cursor.close()
+<<<<<<< HEAD
         return render_template('manage_products.html', products=products, user=get_user())
     except Error:
+=======
+
+        return render_template(
+            'manage_products.html',
+            products=products,
+            product_stats={
+                'total_products': len(products),
+                'low_stock_products': sum(1 for product in products if product['low_stock']),
+                'out_of_stock_products': sum(1 for product in products if not product['in_stock']),
+            },
+            user=get_user(),
+        )
+    except Error as e:
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
         flash('Error loading products.', 'danger')
-        return render_template('manage_products.html', products=[], user=get_user())
+        return render_template(
+            'manage_products.html',
+            products=[],
+            product_stats={'total_products': 0, 'low_stock_products': 0, 'out_of_stock_products': 0},
+            user=get_user(),
+        )
 
 @app.route('/delete_product/<int:product_id>')
 @admin_required
@@ -760,6 +1474,7 @@ def edit_product(product_id):
             if request.method == 'POST':
                 name        = request.form['name'].strip()
                 description = request.form['description'].strip()
+<<<<<<< HEAD
                 price       = request.form['price']
                 image       = request.form['image'].strip()
                 stock       = request.form.get('stock', 0)
@@ -769,21 +1484,65 @@ def edit_product(product_id):
                     cursor.close()
                     return render_template('edit_product.html', product=product, user=get_user())
 
+=======
+                price = request.form['price']
+                image = request.form.get('image', '').strip() or None
+                stock = request.form.get('stock', 0)
+                category_name = normalize_category_name(request.form.get('category_name', ''))
+                
+                if not name or not price:
+                    flash('Name and price are required.', 'danger')
+                    cursor.close()
+                    return render_template(
+                        'edit_product.html',
+                        product={**product, 'name': name, 'description': description, 'image': image, 'category_name': category_name},
+                        user=get_user(),
+                    )
+                
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
                 try:
                     price = float(price)
                     stock = int(stock) if stock else 0
                     if price < 0:
                         flash('Price cannot be negative.', 'danger')
                         cursor.close()
-                        return render_template('edit_product.html', product=product, user=get_user())
+                        return render_template(
+                            'edit_product.html',
+                            product={**product, 'name': name, 'description': description, 'price': price, 'image': image, 'stock': stock, 'category_name': category_name},
+                            user=get_user(),
+                        )
+                    if stock < 0:
+                        flash('Stock cannot be negative.', 'danger')
+                        cursor.close()
+                        return render_template(
+                            'edit_product.html',
+                            product={**product, 'name': name, 'description': description, 'price': price, 'image': image, 'stock': stock, 'category_name': category_name},
+                            user=get_user(),
+                        )
                 except ValueError:
                     flash('Invalid price or stock value.', 'danger')
                     cursor.close()
+<<<<<<< HEAD
                     return render_template('edit_product.html', product=product, user=get_user())
 
                 cursor.execute(
                     'UPDATE products SET name=%s, description=%s, price=%s, image=%s, stock=%s WHERE id=%s',
                     (name, description, price, image, stock, product_id)
+=======
+                    return render_template(
+                        'edit_product.html',
+                        product={**product, 'name': name, 'description': description, 'image': image, 'stock': stock, 'category_name': category_name},
+                        user=get_user(),
+                    )
+                
+                cursor.execute(
+                    '''
+                    UPDATE products
+                    SET name = %s, description = %s, price = %s, image = %s, stock = %s, category_name = %s
+                    WHERE id = %s
+                    ''',
+                    (name, description, price, image, stock, category_name, product_id)
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
                 )
                 conn.commit()
                 cursor.close()
@@ -902,7 +1661,13 @@ def internal_error(error):
     return render_template('500.html'), 500
 
 # ============= RUN APPLICATION =============
+<<<<<<< HEAD
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+=======
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))  # Use platform port
+    app.run(host='0.0.0.0', port=port)
+>>>>>>> f75be3e (Prepare Railway deployment and upgrade storefront)
