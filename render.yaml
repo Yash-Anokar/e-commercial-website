@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: vapc-ecommerce
+    env: python
+    pythonVersion: 3.11.0
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: vasundhara_agro_db
+      - key: DB_PORT
+        value: 3306
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+
+databases:
+  - name: vapc-mysql
+    databaseName: vasundhara_agro_db
+    user: vapc_user
