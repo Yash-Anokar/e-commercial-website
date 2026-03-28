@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-import pymysql
-from pymysql import Error
+import psycopg2
+from psycopg2 import Error
+from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import random
@@ -37,15 +38,17 @@ SITE_NAME = "Vasundhara Agro Processing unit"
 SITE_LOCATION = "Anjangaon Surji"
 SITE_TAGLINE = "Pure Ayurvedic Products from Nature"
 
-# MySQL Database configuration - Use environment variables for production
+# Prefer a full URL on Render, with local fallback for development.
+DB_URL = os.getenv('DATABASE_URL')
+if DB_URL and DB_URL.startswith('postgres://'):
+    DB_URL = DB_URL.replace('postgres://', 'postgresql://', 1)
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST') or os.getenv('MYSQLHOST', 'localhost'),
-    'user': os.getenv('DB_USER') or os.getenv('MYSQLUSER', 'root'),
-    'password': os.getenv('DB_PASSWORD') or os.getenv('MYSQLPASSWORD', ''),
-    'database': os.getenv('DB_NAME') or os.getenv('MYSQLDATABASE', 'vasundhara_agro_db'),
-    'port': int(os.getenv('DB_PORT') or os.getenv('MYSQLPORT', 3306)),
-    'charset': 'utf8mb4',
-    'cursorclass': pymysql.cursors.DictCursor
+    'host': os.getenv('DB_HOST') or os.getenv('PGHOST') or 'localhost',
+    'user': os.getenv('DB_USER') or os.getenv('PGUSER') or 'postgres',
+    'password': os.getenv('DB_PASSWORD') or os.getenv('PGPASSWORD') or '',
+    'dbname': os.getenv('DB_NAME') or os.getenv('PGDATABASE') or 'vasundhara_agro_db',
+    'port': int(os.getenv('DB_PORT') or os.getenv('PGPORT') or 5432),
+    'sslmode': os.getenv('DB_SSLMODE', 'prefer')
 }
 
 # OTP storage (in-memory for development, use Redis in production)
@@ -56,7 +59,10 @@ def get_db_connection():
     """Context manager for database connections"""
     conn = None
     try:
-        conn = pymysql.connect(**DB_CONFIG)
+        if DB_URL:
+            conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+        else:
+            conn = psycopg2.connect(**DB_CONFIG, cursor_factory=RealDictCursor)
         yield conn
     except Error as e:
         print(f"Database connection error: {e}")
@@ -70,48 +76,34 @@ def ensure_column_exists(cursor, table_name, column_name, definition):
     cursor.execute(
         '''
         SELECT 1
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = %s AND column_name = %s
         ''',
-        (DB_CONFIG['database'], table_name, column_name)
+        (table_name, column_name)
     )
     if not cursor.fetchone():
         cursor.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}')
 
 def init_db():
     """Initialize the database with tables"""
-    # First, create the database if it doesn't exist
-    try:
-        config_without_db = DB_CONFIG.copy()
-        config_without_db.pop('database')
-        conn = pymysql.connect(**config_without_db)
-        cursor = conn.cursor()
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']}")
-        print(f"Database '{DB_CONFIG['database']}' created or already exists.")
-        cursor.close()
-        conn.close()
-    except Error as e:
-        print(f"Error creating database: {e}")
-        return
-    
-    # Now connect to the database and create tables
+    # Connect to the database and create tables
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             
             # Users table
             cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 username VARCHAR(255) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
                 email VARCHAR(255),
-                is_admin TINYINT(1) DEFAULT 0,
+                is_admin BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''')
             
             # Products table
             cursor.execute('''CREATE TABLE IF NOT EXISTS products (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 description TEXT,
                 price DECIMAL(10, 2) NOT NULL,
@@ -119,12 +111,12 @@ def init_db():
                 stock INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''')
-            ensure_column_exists(cursor, 'products', 'category_name', 'VARCHAR(100) NULL AFTER stock')
-            ensure_column_exists(cursor, 'products', 'is_active', 'TINYINT(1) DEFAULT 1 AFTER category_name')
+            ensure_column_exists(cursor, 'products', 'category_name', 'VARCHAR(100)')
+            ensure_column_exists(cursor, 'products', 'is_active', 'BOOLEAN DEFAULT TRUE')
             
             # Cart table
             cursor.execute('''CREATE TABLE IF NOT EXISTS cart (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 user_id INT NOT NULL,
                 product_id INT NOT NULL,
                 quantity INT NOT NULL DEFAULT 1,
@@ -135,7 +127,7 @@ def init_db():
             
             # Orders table with delivery tracking
             cursor.execute('''CREATE TABLE IF NOT EXISTS orders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 user_id INT NOT NULL,
                 customer_name VARCHAR(255),
                 customer_phone VARCHAR(20),
@@ -149,13 +141,13 @@ def init_db():
                 status VARCHAR(50) DEFAULT 'pending',
                 delivery_date TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )''')
             
             # Order items table
             cursor.execute('''CREATE TABLE IF NOT EXISTS order_items (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 order_id INT NOT NULL,
                 product_id INT NOT NULL,
                 quantity INT NOT NULL,
@@ -166,7 +158,7 @@ def init_db():
             
             # Order status history table
             cursor.execute('''CREATE TABLE IF NOT EXISTS order_status_history (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 order_id INT NOT NULL,
                 status VARCHAR(50) NOT NULL,
                 notes TEXT,
@@ -184,7 +176,7 @@ def init_db():
                 admin_password = generate_password_hash('admin123')
                 cursor.execute(
                     "INSERT INTO users (username, password, email, is_admin) VALUES (%s, %s, %s, %s)", 
-                    ('admin', admin_password, 'admin@example.com', 1)
+                    ('admin', admin_password, 'admin@example.com', True)
                 )
                 conn.commit()
                 print("Admin user created: username='admin', password='admin123'")
@@ -192,9 +184,9 @@ def init_db():
             # Fix NULL customer names in existing orders
             cursor.execute('''
                 UPDATE orders o
-                JOIN users u ON o.user_id = u.id
-                SET o.customer_name = u.username
-                WHERE o.customer_name IS NULL
+                SET customer_name = u.username
+                FROM users u
+                WHERE o.user_id = u.id AND o.customer_name IS NULL
             ''')
             conn.commit()
             if cursor.rowcount > 0:
@@ -314,7 +306,7 @@ def fetch_distinct_categories(cursor):
         '''
         SELECT DISTINCT category_name
         FROM products
-        WHERE is_active = 1
+        WHERE is_active = TRUE
           AND category_name IS NOT NULL
           AND TRIM(category_name) <> ''
         ORDER BY category_name ASC
@@ -437,11 +429,11 @@ def home():
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            filters = ['is_active = 1']
+            filters = ['is_active = TRUE']
             params = []
             if search_query:
                 like_value = f'%{search_query}%'
-                filters.append('(name LIKE %s OR description LIKE %s)')
+                filters.append('(name ILIKE %s OR description ILIKE %s)')
                 params.extend([like_value, like_value])
             if selected_category:
                 filters.append('category_name = %s')
@@ -476,7 +468,7 @@ def home():
                         ELSE category_name
                     END), 0) AS category_count
                 FROM products
-                WHERE is_active = 1
+                WHERE is_active = TRUE
                 '''
             )
             store_stats = cursor.fetchone() or {}
@@ -613,7 +605,7 @@ def product_detail(product_id):
                 '''
                 SELECT id, name, description, price, image, stock, category_name, is_active, created_at
                 FROM products
-                WHERE id = %s AND is_active = 1
+                WHERE id = %s AND is_active = TRUE
                 ''',
                 (product_id,)
             )
@@ -632,7 +624,7 @@ def product_detail(product_id):
                 '''
                 SELECT id, name, description, price, image, stock, category_name, is_active, created_at
                 FROM products
-                WHERE is_active = 1
+                    WHERE is_active = TRUE
                   AND id <> %s
                   AND (
                         category_name = %s
@@ -658,7 +650,7 @@ def product_detail(product_id):
                     '''
                     SELECT id, name, description, price, image, stock, category_name, is_active, created_at
                     FROM products
-                    WHERE is_active = 1 AND id <> %s
+                    WHERE is_active = TRUE AND id <> %s
                     ORDER BY created_at DESC
                     LIMIT 4
                     ''',
@@ -702,7 +694,7 @@ def add_to_cart(product_id):
             cursor = conn.cursor()
             
             # Check if product exists
-            cursor.execute('SELECT * FROM products WHERE id = %s AND is_active = 1', (product_id,))
+            cursor.execute('SELECT * FROM products WHERE id = %s AND is_active = TRUE', (product_id,))
             product = cursor.fetchone()
             
             if not product:
@@ -1020,11 +1012,13 @@ def process_checkout():
                  delivery_city, delivery_pincode, delivery_instructions, 
                  payment_method, tracking_number, total_amount, status) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
             ''', (user['id'], customer_name, customer_phone, delivery_address,
                   delivery_city, delivery_pincode, delivery_instructions,
                   payment_method, tracking_number, total_amount, 'confirmed'))
             
-            order_id = conn.insert_id()
+            order_row = cursor.fetchone() or {}
+            order_id = order_row.get('id')
             
             # Add order items
             for item in cart_items:
@@ -1112,7 +1106,7 @@ def orders():
                     o.delivery_pincode,
                     o.customer_name,
                     COALESCE(SUM(oi.quantity), 0) AS total_items,
-                    GROUP_CONCAT(CONCAT(p.name, ' (x', oi.quantity, ')') SEPARATOR ', ') AS items
+                    STRING_AGG(p.name || ' (x' || oi.quantity::text || ')', ', ' ORDER BY p.name) AS items
                 FROM orders o
                 LEFT JOIN order_items oi ON o.id = oi.order_id
                 LEFT JOIN products p ON oi.product_id = p.id
@@ -1189,7 +1183,7 @@ def track_order(tracking_number):
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT o.*, 
-                       GROUP_CONCAT(CONCAT(p.name, ' x', oi.quantity) SEPARATOR ', ') as items
+                      STRING_AGG(p.name || ' x' || oi.quantity::text, ', ' ORDER BY p.name) as items
                 FROM orders o
                 JOIN order_items oi ON o.id = oi.order_id
                 JOIN products p ON oi.product_id = p.id
@@ -1247,7 +1241,7 @@ def add_product():
                     INSERT INTO products (name, description, price, image, stock, category_name, is_active)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ''',
-                    (name, description, price, image, stock, category_name, 1)
+                    (name, description, price, image, stock, category_name, True)
                 )
                 conn.commit()
                 cursor.close()
@@ -1270,7 +1264,7 @@ def manage_products():
                 '''
                 SELECT id, name, description, price, image, stock, category_name, is_active, created_at
                 FROM products
-                WHERE is_active = 1
+                WHERE is_active = TRUE
                 ORDER BY created_at DESC
                 '''
             )
@@ -1430,12 +1424,12 @@ def admin_orders():
                     o.total_amount,
                     o.status,
                     u.username,
-                    GROUP_CONCAT(CONCAT(p.name, ' x', oi.quantity) SEPARATOR ', ') as items
+                    STRING_AGG(p.name || ' x' || oi.quantity::text, ', ' ORDER BY p.name) as items
                 FROM orders o
                 JOIN users u ON o.user_id = u.id
                 JOIN order_items oi ON o.id = oi.order_id
                 JOIN products p ON oi.product_id = p.id
-                GROUP BY o.id
+                GROUP BY o.id, u.username
                 ORDER BY o.created_at DESC
             ''')
             orders = cursor.fetchall()
@@ -1460,7 +1454,7 @@ def update_order_status(order_id):
             
             # Update order status
             cursor.execute(
-                'UPDATE orders SET status = %s WHERE id = %s',
+                'UPDATE orders SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s',
                 (new_status, order_id)
             )
             
