@@ -180,6 +180,76 @@ def init_db():
                 )
                 conn.commit()
                 print("Admin user created: username='admin', password='admin123'")
+
+            # Seed initial catalog for brand-new databases
+            cursor.execute("SELECT COUNT(*) AS total FROM products WHERE is_active = TRUE")
+            product_count_row = cursor.fetchone() or {}
+            if int(product_count_row.get('total') or 0) == 0:
+                default_products = [
+                    (
+                        'Safed Musli',
+                        'Premium quality Safed Musli for strength and vitality support.',
+                        340.00,
+                        None,
+                        20,
+                        'Ayurvedic Herbs',
+                        True,
+                    ),
+                    (
+                        'Ashwagandha',
+                        'Traditional Ashwagandha root powder for daily wellness routines.',
+                        280.00,
+                        None,
+                        30,
+                        'Ayurvedic Herbs',
+                        True,
+                    ),
+                    (
+                        'Shatavari',
+                        'Pure Shatavari herb sourced for consistent quality and freshness.',
+                        300.00,
+                        None,
+                        18,
+                        'Ayurvedic Herbs',
+                        True,
+                    ),
+                    (
+                        'Lendi Pimpli',
+                        'Classic Lendi Pimpli formulation used in traditional preparations.',
+                        260.00,
+                        None,
+                        15,
+                        'Ayurvedic Herbs',
+                        True,
+                    ),
+                    (
+                        'Moringa',
+                        'Nutrient-rich Moringa powder suitable for everyday nutrition plans.',
+                        220.00,
+                        None,
+                        25,
+                        'Ayurvedic Herbs',
+                        True,
+                    ),
+                    (
+                        'Turmeric Powder',
+                        'Natural turmeric powder with strong aroma and bright color.',
+                        190.00,
+                        None,
+                        40,
+                        'Ayurvedic Herbs',
+                        True,
+                    ),
+                ]
+                cursor.executemany(
+                    '''
+                    INSERT INTO products (name, description, price, image, stock, category_name, is_active)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ''',
+                    default_products
+                )
+                conn.commit()
+                print(f"Seeded {len(default_products)} default products.")
             
             # Fix NULL customer names in existing orders
             cursor.execute('''
